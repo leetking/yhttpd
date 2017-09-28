@@ -12,19 +12,19 @@
 #include <sys/wait.h>
 #include <netinet/ip.h>
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <semaphore.h>
 
+#include <linux/limits.h>
+
 #include "common.h"
+#include "worker.h"
 
 #define BACKLOG     SOMAXCONN
 #define WORKS       2
-#define ACCEPT_LOCK "yhttp-"VER".lock"
-
 
 static int is_deamon = 0;
 static char root[PATH_MAX] = ".";
-static char cgi[]  = ".";
+static char cgi[PATH_MAX]  = ".";
 static uint16_t port = 80;
 
 static int works = WORKS;
@@ -37,6 +37,7 @@ static void help(int argc, char **argv)
            "      -p port   specify a port, default 80\n"
            "      -d        run as daemon\n"
            "      -e path   specify cgi directory, default current directory(.)\n"
+           "      -c num    num processer.\n"
            "\n"
            "(c) %s\n",
            argv[0], VER);
@@ -56,43 +57,6 @@ static int go(int fd)
      *    先采用 select 来实现吧
      */
     return 0;
-}
-
-static int run_worker(int sfd)
-{
-    /* TODO  添加负载均衡 */
-    sem_t *sem = sem_open(ACCEPT_LOCK, O_EXCL);
-    if (sem == SEM_FAILED) {
-        _M("worker sem: %s\n", strerror(errno));
-        return 1;
-    }
-    int ret = 0;
-    for (;;) {
-        struct sockaddr_in cip;
-        socklen_t ciplen = sizeof(cip);
-        if (-1 == sem_wait(sem)) {
-            _M("sem_wait: %s\n", strerror(errno));
-            ret = 1;
-            goto sem_err;
-        }
-        int fd = accept(sfd, (struct sockaddr*)&cip, &ciplen);
-        if (-1 == fd)
-            _M("accept: %s\n", strerror(errno));
-        if (-1 == sem_post(sem)) {
-            _M("sem_post: %s\n", strerror(errno));
-            ret = 1;
-            goto sem_err;
-        }
-
-        if (0 != go(fd))
-            _M("deal client error!\n");
-
-        close(fd);
-    }
-
-sem_err:
-    sem_close(sem);
-    return ret;
 }
 
 int main(int argc, char **argv)
