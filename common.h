@@ -4,11 +4,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define BUFF_SIZE   2048
+#include "log.h"
 
+#define BUFF_SIZE   2048
 #define ACCEPT_LOCK "yhttp-"VER".lock"
 
-#define _M(...) printf(__VA_ARGS__)
+#define _M(l, ...) yhttp_log(l, __VA_ARGS__)
 
 #define MAX(x, y)   ((x)>(y)? (x): (y))
 #define MIN(x, y)   ((x)<(y)? (x): (y))
