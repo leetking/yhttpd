@@ -48,17 +48,6 @@ static void parse_opt(int argc, char **argv)
 
 }
 
-static int go(int fd)
-{
-    /*
-     * TODO 完成 io 处理
-     * 1. 添加新的 fd
-     * 2. 通过高级 IO ，如：select 、epoll 来处里这些 fds
-     *    先采用 select 来实现吧
-     */
-    return 0;
-}
-
 int main(int argc, char **argv)
 {
     parse_opt(argc, argv);
