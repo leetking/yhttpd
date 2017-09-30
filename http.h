@@ -6,13 +6,13 @@
 
 #define HTTP_METADATA_LEN    4096
 
-#define LF     (uint8_t)'\n'
 #define CR     (uint8_t)'\r'
+#define LF     (uint8_t)'\n'
 #define CRLF   "\r\n"
 
 
 typedef struct string_st {
-    uint8_t *str;
+    char const *str;
     int len;
 } string_t;
 
@@ -37,14 +37,19 @@ enum {
 #define HTTP10  10
 #define HTTP11  11
 
+#define HTTP_PARSE_INIT 0
+
 enum {
     HTTP_URI = 0,
-    HTTP_HOST,
-    HTTP_CON,
-    HTTP_UA,
-    HTTP_ACCEPT,
-    HTTP_ACCEPT_ENCODING,
-    HTTP_ACCEPT_LANGUAGE,
+    HTTP_QUERY,             /* query string for GET, HEAD */
+    HTTP_HOST,              /* Host */
+    HTTP_CON,               /* Connection */
+    HTTP_UA,                /* User-Agent */
+    HTTP_ACCEPT,            /* Accept */
+    HTTP_ACCEPT_ENCODING,   /* Accept-Encoding */
+    HTTP_ACCEPT_LANGUAGE,   /* Accept-Language */
+    HTTP_REFERER,           /* Referer */
+    HTTP_COOKIE,            /* Cookie */
 
     HTTP_LINE_MAX,
 };
@@ -57,8 +62,9 @@ struct http_request {
 
     uint8_t iscon:1;
     uint8_t ischunk:1;
-    uint8_t _padding:6;
+    uint8_t _padding:5;
 
+    uint8_t _fin_lf:1;
     int _line_type;
     int _ps_status;  /* 解析状态 */
     int _metadatalen;

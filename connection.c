@@ -21,10 +21,11 @@ struct connection *connection_create(int fd)
     int buffsize = BUFF_SIZE;
     struct connection *con = calloc(1, sizeof(*con)+2*buffsize);
     if (!con) return NULL;
-    con->fd = fd;
     con->_buffsize = buffsize;
+    con->_wrbuff = con->_rdbuff + con->_buffsize;
+    con->fd = fd;
     con->_status = CON_INIT;
-    con->_wrbuff = con->_rdbuff+con->_buffsize;
+    con->_http_req->_ps_status = HTTP_PARSE_INIT;
 
     return con;
 }
@@ -32,10 +33,24 @@ struct connection *connection_create(int fd)
 int connection_write(struct connection *c)
 {
     if (!c) return -1;
+    /* TODO finish connection_write */
+    char buff[] = "HTTP/1.1 200 OK"CRLF
+                  "Server: yhttpd"CRLF
+                  CRLF
+                  "<html><head></head><body><h1>200 OK</h1></body></html>";
     switch (c->_status) {
     case CON_REQ_FIN:
+        write(c->fd, buff, sizeof(buff)-1);
         break;
-    case CON_REQ_ERR:
+
+    case CON_REQ_ERR: {
+        char buff[] = "HTTP/1.0 404 NOT FOUND"CRLF;
+        write(c->fd, buff, sizeof(buff)-1);
+        c->_status = CON_CLOSE;
+        }
+        break;
+
+    default: /* do nothing */
         break;
     }
 
@@ -48,7 +63,7 @@ int connection_read(struct connection *c)
     if (!c) return -1;
     if (!c->_http_req) {
         c->_http_req = malloc(sizeof(struct http_request)+HTTP_METADATA_LEN);
-        c->_http_req->_status = 0;
+        c->_http_req->_ps_status = 0;
         if (!c->_http_req)
             return 1;
     }
@@ -65,8 +80,6 @@ int connection_read(struct connection *c)
         c->_status = CON_REQ_ERR;
         break;
         /* TODO other error! */
-    default:
-        break;
     }
 
     return 0;
