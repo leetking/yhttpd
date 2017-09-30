@@ -8,6 +8,7 @@
 
 enum con_status {
     CON_INIT,
+    CON_REQ_CTU,    /* 解析没有结束接着解析 */
     CON_REQ_FIN,    /* 一次请求接受完毕 */
     CON_REQ_ERR,    /* 请求格式不符合 HTTP 协议 */
     CON_CLOSE,      /* 关闭这个连接 */

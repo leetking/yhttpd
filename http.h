@@ -6,6 +6,11 @@
 
 #define HTTP_METADATA_LEN    4096
 
+#define LF     (uint8_t)'\n'
+#define CR     (uint8_t)'\r'
+#define CRLF   "\r\n"
+
+
 typedef struct string_st {
     uint8_t *str;
     int len;
@@ -15,6 +20,7 @@ typedef struct cookie_st {
 } cookie_t;
 
 enum {
+    HTTP_REQ_CONTINUE,
     HTTP_REQ_INVALID,
     HTTP_REQ_FINISH,
 };
@@ -31,20 +37,30 @@ enum {
 #define HTTP10  10
 #define HTTP11  11
 
+enum {
+    HTTP_URI = 0,
+    HTTP_HOST,
+    HTTP_CON,
+    HTTP_UA,
+    HTTP_ACCEPT,
+    HTTP_ACCEPT_ENCODING,
+    HTTP_ACCEPT_LANGUAGE,
+
+    HTTP_LINE_MAX,
+};
+
 struct http_request {
     int8_t   method;
     int8_t   ver;
-    string_t path;
-    string_t host;
-    string_t ua;
-    cookie_t cookie;
+    string_t lines[HTTP_LINE_MAX];
     int range1, range2;
 
     uint8_t iscon:1;
     uint8_t ischunk:1;
     uint8_t _padding:6;
 
-    int _status;  /* 解析状态 */
+    int _line_type;
+    int _ps_status;  /* 解析状态 */
     int _metadatalen;
     int _metadataidx;
     uint8_t _metadata[1];

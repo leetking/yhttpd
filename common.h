@@ -11,8 +11,9 @@
 
 #define _M(l, ...) yhttp_log(l, __VA_ARGS__)
 
-#define MAX(x, y)   ((x)>(y)? (x): (y))
-#define MIN(x, y)   ((x)<(y)? (x): (y))
+#define MAX(x, y)    ((x)>(y)? (x): (y))
+#define MIN(x, y)    ((x)<(y)? (x): (y))
+#define ARRSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 
 ssize_t writen(int fd, uint8_t const *buff, ssize_t n);
 ssize_t readn(int fd, uint8_t const *buff, ssize_t n);
