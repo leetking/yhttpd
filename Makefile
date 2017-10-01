@@ -31,7 +31,7 @@ test:
 clean:
 	$(RM) $(OBJS) $(DEPS) $(APP)
 
-distclean:
+distclean: clean
 
 pkg:
 

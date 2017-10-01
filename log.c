@@ -8,7 +8,7 @@ static int level = 1;
 
 extern void yhttp_log_set(int l)
 {
-    if (l < 0 || l > 4) return;
+    if (l < LOG_ERROR || l > LOG_DEBUG2) return;
     level = l;
 }
 
@@ -28,7 +28,7 @@ extern void yhttp_log(int l, char const *str, ...)
         "[WARN]  ", "[DEBUG1]",
         "[DEBUG2]",
     };
-    if (l < 0 || l > 4)
+    if (l < LOG_INFO || l > LOG_DEBUG2)
         printf("[ALL]   ");
     else
         printf("%s ", strlevel[l]);

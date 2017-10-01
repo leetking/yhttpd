@@ -13,6 +13,8 @@ enum con_status {
     CON_REQ_ERR,    /* 请求格式不符合 HTTP 协议 */
     CON_CLOSE,      /* 关闭这个连接 */
 };
+static char const err404[] = "";
+static char const err501[] = "";
 
 
 struct connection *connection_create(int fd)
@@ -40,14 +42,13 @@ int connection_write(struct connection *c)
                   "<html><head></head><body><h1>200 OK</h1></body></html>";
     switch (c->_status) {
     case CON_REQ_FIN:
+        _M(LOG_DEBUG2, "");
         write(c->fd, buff, sizeof(buff)-1);
         break;
 
-    case CON_REQ_ERR: {
-        char buff[] = "HTTP/1.0 404 NOT FOUND"CRLF;
-        write(c->fd, buff, sizeof(buff)-1);
+    case CON_REQ_ERR:
+        write(c->fd, err501, sizeof(err501)-1);
         c->_status = CON_CLOSE;
-        }
         break;
 
     default: /* do nothing */
