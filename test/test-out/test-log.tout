@@ -1,0 +1,30 @@
+Log Default:
+2017-10-02 21:03:29 [INFO]   log info
+2017-10-02 21:03:29 [ERROR]  log error
+
+Log level: 0
+2017-10-02 21:03:29 [INFO]   log info
+2017-10-02 21:03:29 [ERROR]  log error
+
+Log level: 1
+2017-10-02 21:03:29 [INFO]   log info
+2017-10-02 21:03:29 [ERROR]  log error
+
+Log level: 2
+2017-10-02 21:03:29 [INFO]   log info
+2017-10-02 21:03:29 [ERROR]  log error
+2017-10-02 21:03:29 [WARN]   log warn
+
+Log level: 3
+2017-10-02 21:03:29 [INFO]   log info
+2017-10-02 21:03:29 [ERROR]  log error
+2017-10-02 21:03:29 [WARN]   log warn
+2017-10-02 21:03:29 [DEBUG1] log debug
+
+Log level: 4
+2017-10-02 21:03:29 [INFO]   log info
+2017-10-02 21:03:29 [ERROR]  log error
+2017-10-02 21:03:29 [WARN]   log warn
+2017-10-02 21:03:29 [DEBUG1] log debug
+2017-10-02 21:03:29 [DEBUG2] log debug2
+

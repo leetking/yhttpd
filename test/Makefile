@@ -6,9 +6,11 @@ LDFLAGS :=
 SRCS := $(wildcard *.c ../*.c)
 DEPS := $(SRCS:.c=.c.d)
 
-all: test-log
+all: test-log test-set
 
 test-log: test-log.c.o ../log.c.o
+	$(CC) -o $@ $^ $(LDFLAGS)
+test-set: test-set.c.o ../set.c.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.c.o: %.c
@@ -16,7 +18,7 @@ test-log: test-log.c.o ../log.c.o
 -include $(DEPS)
 
 clean:
-	$(RM) *.o test-log
+	$(RM) *.o test-log test-set
 distclean: clean
 	$(RM) *.d
 
