@@ -5,6 +5,7 @@
 
 struct node {
     void *ele;
+    unsigned char valid;
     struct node *next;
 };
 
@@ -66,7 +67,7 @@ extern int set_add(set_t s, void *ele)
     if (!s) return -1;
     unsigned int hash = (unsigned int)ele%HASH_MAX;
     struct node **pnodep = &s->_hash[hash];
-    while (*pnodep && (*pnodep)->ele) {
+    while (*pnodep && (*pnodep)->valid) {
         if (0 == s->cmp(ele, (*pnodep)->ele))
             return 0;
         pnodep = &(*pnodep)->next;
@@ -76,6 +77,7 @@ extern int set_add(set_t s, void *ele)
         (*pnodep)->next = NULL;
     }
     (*pnodep)->ele = ele;
+    (*pnodep)->valid = 1;
     s->size++;
     return 0;
 }
@@ -86,9 +88,9 @@ extern int set_remove(set_t s, void const *hint)
     unsigned int hash = (unsigned int)hint%HASH_MAX;
     struct node **pnodep = &s->_hash[hash];
     while (*pnodep) {
-        if ((*pnodep)->ele && !s->cmp(hint, (*pnodep)->ele)) {
+        if ((*pnodep)->valid && !s->cmp(hint, (*pnodep)->ele)) {
             s->free? s->free(&(*pnodep)->ele): 0;
-            (*pnodep)->ele = NULL;
+            (*pnodep)->valid = 0;
             s->size--;
 
             return 0;
@@ -123,7 +125,7 @@ int set_iterate(set_t s, void **ele)
     if (!s) return 0;
     for (;;) {
         for (; s->_iter_node; s->_iter_node = s->_iter_node->next) {
-            if (s->_iter_node->ele) {
+            if (s->_iter_node->valid) {
                 *ele = s->_iter_node->ele;
                 s->_iter_node = s->_iter_node->next;
                 return 1;
@@ -138,4 +140,4 @@ int set_iterate(set_t s, void **ele)
     return 0;
 }
 
-#undef STACK_MAX
+#undef HASH_MAX
