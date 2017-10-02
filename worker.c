@@ -48,10 +48,15 @@ extern int run_worker(int const sfd)
         struct connection *con;
         int maxfd = sfd;
         set_foreach(set, con) {
-            FD_SET(con->fd, &rdset);
-            if (sfd != con->fd)
-                FD_SET(con->fd, &wrset);
-            maxfd = MAX(maxfd, con->fd);
+            FD_SET(con->sktfd, &rdset);
+            if (sfd != con->sktfd)
+                FD_SET(con->sktfd, &wrset);
+            maxfd = MAX(maxfd, con->sktfd);
+            if (-1 != con->nrmfd) {
+                FD_SET(con->nrmfd, &rdset);
+                FD_SET(con->nrmfd, &wrset);
+                maxfd = MAX(maxfd, con->nrmfd);
+            }
         }
         int s = select(maxfd+1, &rdset, &wrset, NULL, NULL);
         if (-1 == s) {
@@ -61,7 +66,7 @@ extern int run_worker(int const sfd)
 
         set_foreach(set, con) {
             /* new connection of client */
-            if (sfd == con->fd && FD_ISSET(con->fd, &rdset)) {
+            if (sfd == con->sktfd && FD_ISSET(con->sktfd, &rdset)) {
                 struct sockaddr_in cip;
                 socklen_t ciplen = sizeof(cip);
                 if (-1 == sem_wait(sem)) {
@@ -86,11 +91,17 @@ extern int run_worker(int const sfd)
                 set_add(set, con);
 
             /* normal read */
-            } else if (FD_ISSET(con->fd, &rdset)) {
+            } else if (FD_ISSET(con->sktfd, &rdset)) {
                 connection_read(con);
             /* normal write */
-            } else if (FD_ISSET(con->fd, &wrset)) {
+            } else if (FD_ISSET(con->sktfd, &wrset)) {
                 connection_write(con);
+
+            /* read, write file */
+            } else if (FD_ISSET(con->nrmfd, &rdset)) {
+                connection_read_nrm(con);
+            } else if (FD_ISSET(con->nrmfd, &wrset)) {
+                connection_write_nrm(con);
             }
             /* finish a transfer */
             if (!connection_isvalid(con)) {
