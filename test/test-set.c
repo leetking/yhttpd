@@ -6,6 +6,7 @@
 
 static void test_set_int(void)
 {
+    printf("test_set_int begin\n");
     set_t set = set_create(sizeof(int), NULL, NULL);
     assert(set);
     assert(set_isempty(set));
@@ -34,31 +35,41 @@ static void test_set_int(void)
     assert(set_isempty(set));
     assert(0 == set_size(set));
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 10; i++)
         set_add(set, (void*)i);
-    }
     set_foreach(set, ele) {
-        printf("%d\n", ele);
+        printf("%d ", ele);
     }
+    printf("\n");
 
-    for (int i = 0; i < 200; i++) {
+    for (int i = 0; i < 5; i++)
         set_remove(set, (void*)i);
-    }
     set_foreach(set, ele) {
-        printf("%d\n", ele);
+        printf("%d ", ele);
     }
+    printf("\n");
+
+    for (int i = 0; i < 4; i++)
+        set_add(set, (void*)i);
+    set_foreach(set, ele) {
+        printf("%d ", ele);
+    }
+    printf("\n");
 
     set_foreach(set, ele) {
         set_remove(set, (void*)ele);
     }
 
-    /* it should no print */
+    /* it should be no print */
+    printf("it should be no print\n");
     set_foreach(set, ele) {
         printf("%d\n", ele);
     }
 
     set_destory(&set);
     assert(NULL == set);
+
+    printf("test_set_int end\n\n");
 }
 
 struct stu {
