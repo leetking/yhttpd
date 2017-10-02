@@ -52,6 +52,7 @@ static void parse_opt(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
+    yhttp_log_set(LOG_DEBUG2);
     parse_opt(argc, argv);
 
     int ret = 0;
@@ -90,6 +91,7 @@ int main(int argc, char **argv)
     }
 
     for (int i = 0; i < works; i++) {
+        int r;
         pid_t pid = fork();
         switch (pid) {
         case 0: /* child */
@@ -110,12 +112,13 @@ int main(int argc, char **argv)
         pid = wait(NULL);
         _M(LOG_DEBUG2, "child %d quit.\n", pid);
         neopid = fork();
-        if (0 == pid) {
+        if (0 == neopid) {
             exit(run_worker(sfd));
+
         } else if (-1 == pid) {
             _M(LOG_DEBUG2, "restart child %d error.\n", neopid);
-        }
-        _M(LOG_DEBUG2, "restart child %d -> %d.\n", pid, neopid);
+        } else
+            _M(LOG_DEBUG2, "restart child %d -> %d.\n", pid, neopid);
     }
 
     sem_unlink(ACCEPT_LOCK);

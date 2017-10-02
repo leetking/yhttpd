@@ -1,7 +1,7 @@
 #include "set.h"
 #include <stdint.h>
 
-#define HASH_MAX   (9971)
+#define HASH_MAX   (9973)
 
 struct node {
     void *ele;
@@ -27,7 +27,7 @@ static int scmp(void const *x, void const *y)
 
 extern set_t set_create(size_t elesize, cmp_t *cmp, free_t *free)
 {
-    set_t s = calloc(1, sizeof(struct set_t) + HASH_MAX*sizeof(struct node));
+    set_t s = calloc(1, sizeof(struct set_t) + HASH_MAX*sizeof(struct node*));
     if (!s) return NULL;
     s->elesize = elesize;
     s->free = free;
@@ -39,10 +39,16 @@ extern void set_destory(set_t *s)
 {
     if (!s || !*s) return;
 
-    /* remove element */
-    void *ele;
-    set_foreach(*s, ele) {
-        set_remove(*s, ele);
+    /* remove element and hash table */
+    for (int i = 0; i < HASH_MAX; i++) {
+        struct node *pnode = (*s)->_hash[i];
+        struct node *pnext;
+        while (pnode) {
+            pnext = pnode->next;
+            (*s)->free? (*s)->free(&pnode->ele): 0;
+            free(pnode);
+            pnode = pnext;
+        }
     }
 
     /* free structure */

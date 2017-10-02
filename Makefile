@@ -24,7 +24,7 @@ $(APP): $(OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS)
 %.c.o: %.c
 	$(CC) -o $@ -c $^ $(CFLAGS)
--include $(DEPS)
+#-include $(DEPS)
 
 test:
 

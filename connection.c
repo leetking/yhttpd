@@ -35,7 +35,6 @@ extern struct connection *connection_create(int sktfd)
     con->sktfd = sktfd;
     con->nrmfd = -1;
     con->_status = CON_INIT;
-    con->_http_req->_ps_status = HTTP_PARSE_INIT;
 
     return con;
 }
@@ -89,7 +88,7 @@ extern int connection_read(struct connection *c)
     if (!c) return -1;
     if (!c->_http_req) {
         c->_http_req = malloc(sizeof(struct http_request)+HTTP_METADATA_LEN);
-        c->_http_req->_ps_status = 0;
+        c->_http_req->_ps_status = HTTP_PARSE_INIT;
         if (!c->_http_req)
             return 1;
     }
