@@ -39,11 +39,11 @@ enum {
 
 #define HTTP_PARSE_INIT 0
 
+/* HTTP lines index */
 enum {
     HTTP_URI = 0,
     HTTP_QUERY,             /* query string for GET, HEAD */
     HTTP_HOST,              /* Host */
-    HTTP_CON,               /* Connection */
     HTTP_UA,                /* User-Agent */
     HTTP_ACCEPT,            /* Accept */
     HTTP_ACCEPT_ENCODING,   /* Accept-Encoding */
@@ -72,6 +72,8 @@ struct http_request {
     uint8_t _metadata[1];
 };
 
+extern struct http_request *http_request_malloc(size_t metadatalen);
+extern void http_request_free(struct http_request **req);
 extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssize_t len);
 
 #endif /* HTTP_H__ */

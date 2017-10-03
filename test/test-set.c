@@ -4,74 +4,6 @@
 
 #include "../set.h"
 
-static void test_set_int(void)
-{
-    printf("test_set_int begin\n");
-    set_t set = set_create(sizeof(int), NULL, NULL);
-    assert(set);
-    assert(set_isempty(set));
-    assert(0 == set_size(set));
-    assert(!set_isfull(set));
-
-    set_add(set, (void*)1);
-    assert(!set_isempty(set));
-    assert(1 == set_size(set));
-
-    set_add(set, (void*)2);
-    assert(!set_isempty(set));
-    assert(2 == set_size(set));
-
-    int ele;
-    set_foreach(set, ele) {
-        printf("%d ", ele);
-    }
-    printf("\n");
-
-    set_remove(set, (void*)2);
-    assert(!set_isempty(set));
-    assert(1 == set_size(set));
-
-    set_remove(set, (void*)1);
-    assert(set_isempty(set));
-    assert(0 == set_size(set));
-
-    for (int i = 0; i < 10; i++)
-        set_add(set, (void*)i);
-    set_foreach(set, ele) {
-        printf("%d ", ele);
-    }
-    printf("\n");
-
-    for (int i = 0; i < 5; i++)
-        set_remove(set, (void*)i);
-    set_foreach(set, ele) {
-        printf("%d ", ele);
-    }
-    printf("\n");
-
-    for (int i = 0; i < 4; i++)
-        set_add(set, (void*)i);
-    set_foreach(set, ele) {
-        printf("%d ", ele);
-    }
-    printf("\n");
-
-    set_foreach(set, ele) {
-        set_remove(set, (void*)ele);
-    }
-
-    /* it should be no print */
-    printf("it should be no print\n");
-    set_foreach(set, ele) {
-        printf("%d\n", ele);
-    }
-
-    set_destory(&set);
-    assert(NULL == set);
-
-    printf("test_set_int end\n\n");
-}
-
 struct stu {
     char *name;
     int age;
@@ -81,6 +13,12 @@ void stu_free(struct stu **pobjp)
     assert(pobjp);
     assert(*pobjp);
     free((*pobjp)->name);
+}
+int stu_cmp(struct stu const *a, struct stu const *b)
+{
+    if (!strcmp(a->name, b->name) && (a->age == b->age))
+        return 0;
+    return 1;
 }
 struct stu *stu_new(char const *name, int age)
 {
@@ -100,28 +38,96 @@ char *stu_str(struct stu const *s)
 
 static void test_set_obj(void)
 {
-    set_t set = set_create(sizeof(struct stu*), NULL, (free_t*)stu_free);
+    const int CNT = 10000;
+    set_t set = set_create((cmp_t*)stu_cmp, (free_t*)stu_free);
     assert(set);
     assert(0 == set_size(set));
     assert(set_isempty(set));
 
-    for (int i = 0; i < 50000; i++) {
+    for (int i = 0; i < CNT; i++) {
         char buff[46] = "";
         snprintf(buff, 46, "%d-name", i);
         struct stu *s = stu_new(buff, i);
         set_add(set, s);
+        if (i+1 != set_size(set)) {
+            printf("%d+1 != %d\n", i, set_size(set));
+            assert(i+1 == set_size(set));
+        }
     }
     struct stu *s;
+    int cnt = 0;
     set_foreach(set, s) {
         printf("%s\n", stu_str(s));
+        cnt++;
     }
+    if (cnt != CNT) {
+        printf("cnt: %d\n", cnt);
+        assert(cnt == CNT);
+    }
+
+    set_destory(&set);
+}
+
+static void test_set_order(void)
+{
+    set_t set = set_create((cmp_t*)stu_cmp, (free_t*)stu_free);
+    char buff[46];
+
+    set_add(set, stu_new("0-name", 0));
+    assert(1 == set_size(set));
+
+    int cnt = 0;
+    struct stu *stu;
+    set_foreach(set, stu) {
+        snprintf(buff, 46, "%d-name", cnt+10);
+        struct stu *obj = stu_new(buff, cnt+10);
+        set_add(set, obj);
+        cnt++;
+    }
+    assert(1 == cnt);
+    assert(2 == set_size(set));
+
+    cnt = 0;
+    set_foreach(set, stu) {
+        cnt++;
+    }
+    printf("cnt: %d == set_size: %d == 2\n", cnt, set_size(set));
+    assert(cnt == set_size(set));
+
+    cnt = 0;
+    set_foreach(set, stu) {
+        set_remove(set, stu);
+        stu_free(&stu);
+        cnt++;
+    }
+    printf("cnt: %d == 2\n", cnt);
+    assert(cnt == 2);
+    assert(0 == set_size(set));
+
+    const int CNT = 50;
+    for (int i = 0; i < CNT; i++) {
+        snprintf(buff, 46, "%d-name", i);
+        struct stu *obj = stu_new(buff, i);
+        set_add(set, obj);
+        if (i+1 != set_size(set)) {
+            printf("%d+1 != %d\n", i, set_size(set));
+            assert(i+1 == set_size(set));
+        }
+    }
+
+    cnt = 0;
+    set_foreach(set, stu) {
+        cnt++;
+    }
+    printf("cnt: %d == set_size: %d\n", cnt, set_size(set));
+    assert(cnt == set_size(set));
 
     set_destory(&set);
 }
 
 int main()
 {
-    test_set_int();
     test_set_obj();
+    test_set_order();
     return 0;
 }

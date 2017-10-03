@@ -17,22 +17,22 @@ typedef int  cmp_t(void const *x, void const *y);
  * if free == NULL then
  *  no free element
  */
-extern T set_create(size_t elesize, cmp_t *cmp, free_t *free);
+extern T set_create(cmp_t *cmp, free_t *free);
 extern void set_destory(T *s);
 extern int set_size(T s);
 extern int set_isempty(T s);
 extern int set_isfull(T s);
-extern int set_add(T s, void *ele);
-extern int set_remove(T s, void const *hint);
+extern int set_add(T s, void *obj);
+extern int set_remove(T s, void *hint);
 
 extern void set_gc(T s);
 
 /* a sample interater */
-#define set_foreach(s, ele) \
-        for (set_start(s); set_iterate(s, (void**)&ele); )
+#define set_foreach(s, obj) \
+        for (set_start(s); set_iterate(s, (void**)&obj); )
 
 /* private function, though we can invoke them, but may be rmeoved. */
 int set_start(T s);
-int set_iterate(T s, void **ele);
+int set_iterate(T s, void **pobj);
 
 #endif /* SET_H__ */

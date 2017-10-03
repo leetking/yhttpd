@@ -7,7 +7,7 @@
 #include "log.h"
 
 #define BUFF_SIZE   2048
-#define ACCEPT_LOCK ("yhttp-"VER".lock")
+#define ACCEPT_LOCK "yhttp-" VER ".lock"
 
 #define _M(l, ...) yhttp_log(l, __VA_ARGS__)
 

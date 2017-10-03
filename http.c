@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
@@ -5,6 +6,31 @@
 
 #include "common.h"
 #include "http.h"
+
+//#define LOCAL_TEST
+
+#ifdef LOCAL_TEST
+# define _D(...) printf(__VA_ARGS__)
+#else
+# define _D(...) ((void)0)
+#endif /* LOCAL_TEST */
+
+extern struct http_request *http_request_malloc(size_t metadatalen)
+{
+    struct http_request *ret;
+    ret = malloc(sizeof(*ret)+metadatalen);
+    if (!ret) return NULL;
+    ret->_ps_status = HTTP_PARSE_INIT;
+    ret->_metadataidx = 0;
+    ret->_metadatalen = metadatalen;
+    return ret;
+}
+extern void http_request_free(struct http_request **req)
+{
+    if (!req || !*req) return;
+    free(*req);
+    *req = NULL;
+}
 
 extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssize_t len)
 {
@@ -26,16 +52,12 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
         PS_VALUE_BF,
         PS_VALUE_IN,
     };
+
     enum {
-        LINE_CON,    /* Connection */
-        LINE_UA,     /* User-Agent */
-        LINE_ACCEPT, /* Accept */
-        LINE_ACPT_ENCODING, /* Accept-Encoding */
-        LINE_ACPT_LANGUAGE, /* Accept-Language */
-        LINE_RANGE,         /* Range */
-        LINE_REFERER,       /* Referer */
-        LINE_COOKIE,        /* Cookie */
-        /* TODO request type */
+        HTTP_LINE_EXT_CON  = HTTP_LINE_MAX,
+        HTTP_LINE_EXT_RANGE,
+
+        HTTP_LINE_EXT_IGN,
     };
 
     uint8_t const *req_start = buff;
@@ -75,8 +97,7 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                     return HTTP_REQ_INVALID;
                 }
                 req->_ps_status = PS_URI_BF;
-            }
-            if (!isupper(*p))
+            } else if (!isupper(*p))
                 return HTTP_REQ_INVALID;
             break;
 
@@ -193,25 +214,35 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                     string_t key;
                     int type;
                 } keys[] = {
-                    { { "Connection",       10, }, LINE_CON, },
-                    { { "Referer",          7,  }, LINE_REFERER, },
-                    { { "User-Agent",       10, }, LINE_UA,  },
-                    { { "Accept",           6,  }, LINE_ACCEPT, },
-                    { { "Accept-Encoding",  15, }, LINE_ACPT_ENCODING, },
-                    { { "Accept-Language",  15, }, LINE_ACPT_LANGUAGE, },
-                    { { "Range",            5,  }, LINE_RANGE, },
-                    { { "Cookie",           6,  }, LINE_COOKIE, },
+                    { { "Connection",       10, }, HTTP_LINE_EXT_CON, },
+                    { { "Referer",          7,  }, HTTP_REFERER, },
+                    { { "User-Agent",       10, }, HTTP_UA,  },
+                    { { "Accept",           6,  }, HTTP_ACCEPT, },
+                    { { "Accept-Encoding",  15, }, HTTP_ACCEPT_ENCODING, },
+                    { { "Accept-Language",  15, }, HTTP_ACCEPT_LANGUAGE, },
+                    { { "Range",            5,  }, HTTP_LINE_EXT_RANGE, },
+                    { { "Cookie",           6,  }, HTTP_COOKIE, },
+
+                    /* { { "", 0, }, HTTP_LINE_EXT_IGN, }, */
                 };
                 int len = p - req_start;
-                for (int i = 0; i < (int)ARRSIZE(keys); i++) {
+                _D("key: %.*s\t", len, req_start);
+                int i;
+                for (i = 0; i < (int)ARRSIZE(keys); i++) {
                     if ((keys[i].key.len == len) && !strncasecmp(keys[i].key.str, (char*)req_start, len)) {
                         req->_line_type = keys[i].type;
                         req->_ps_status = PS_VALUE_BF;
                         break;
                     }
                 }
-            }
-            if (!(isalpha(*p) || '-' == *p || '_' == *p))
+
+                /* ignore */
+                if (i >= (int)ARRSIZE(keys)) {
+                    req->_line_type = HTTP_LINE_EXT_IGN;
+                    req->_ps_status = PS_VALUE_BF;
+                }
+
+            } else if (!(isalpha(*p) || '-' == *p || '_' == *p))
                 return HTTP_REQ_INVALID;
             break;
 
@@ -226,18 +257,25 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
             if (CR == *p) {
                 int rest, len;
                 switch (req->_line_type) {
-                case LINE_RANGE:    /* TODO http.c parse range */
+                case HTTP_LINE_EXT_RANGE:    /* TODO http.c parse range */
+                    _D("value: HTTP_LINE_EXT_RANGE\n");
 
                     break;
 
-                case LINE_CON:
+                case HTTP_LINE_EXT_CON:
+                    _D("value: HTTP_LINE_EXT_CON\n");
                     if ((5 == p-req_start) && !strncasecmp("close", (char*)req_start, 5))
                         req->iscon = 0;
+                    break;
+
+                case HTTP_LINE_EXT_IGN:
+                    _D("value: HTTP_LINE_EXT_IGN(%.*s)\n", (int)(p-req_start), req_start);
                     break;
 
                 default:
                     rest = req->_metadatalen - req->_metadataidx;
                     len = MIN(p - req_start, rest);
+                    _D("value: %.*s\n", len, req_start);
                     if (len <= 0)
                         return HTTP_REQ_INVALID;    /* to long! */
                     req->lines[req->_line_type].str = (char*)req->_metadata + req->_metadataidx;
@@ -245,9 +283,10 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                     memcpy(req->_metadata + req->_metadataidx, req_start, len);
                     req->_metadataidx += len;
                 }
-            }
-            if (LF == *p)
+
+            } else if (LF == *p) {
                 req->_ps_status = PS_LINE_BF;
+            }
             break;
         }
     }

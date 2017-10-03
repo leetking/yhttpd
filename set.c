@@ -1,20 +1,22 @@
 #include "set.h"
 #include <stdint.h>
 
-#define HASH_MAX   (9973)
+/* #define HASH_MAX   (9973) */
+#define HASH_MAX   (7)
 
 struct node {
-    void *ele;
+    void *obj;
     unsigned char valid;
+    unsigned char _iter_id;
     struct node *next;
 };
 
 struct set_t {
-    int elesize;
     free_t *free;
     cmp_t  *cmp;
     int size;
 
+    unsigned char _iter_id;
     int _iter_hash_idx;
     struct node *_iter_node;
     struct node *_hash[1];
@@ -25,13 +27,13 @@ static int scmp(void const *x, void const *y)
     return (intptr_t)x-(intptr_t)y;
 }
 
-extern set_t set_create(size_t elesize, cmp_t *cmp, free_t *free)
+extern set_t set_create(cmp_t *cmp, free_t *free)
 {
     set_t s = calloc(1, sizeof(struct set_t) + HASH_MAX*sizeof(struct node*));
     if (!s) return NULL;
-    s->elesize = elesize;
     s->free = free;
     s->cmp = cmp? cmp: scmp;
+    s->_iter_id = 0;
 
     return s;
 }
@@ -45,7 +47,7 @@ extern void set_destory(set_t *s)
         struct node *pnext;
         while (pnode) {
             pnext = pnode->next;
-            (*s)->free? (*s)->free(&pnode->ele): 0;
+            (*s)->free? (*s)->free(&pnode->obj): 0;
             free(pnode);
             pnode = pnext;
         }
@@ -68,13 +70,13 @@ extern int set_size(set_t s)
 {
     return s->size;
 }
-extern int set_add(set_t s, void *ele)
+extern int set_add(set_t s, void *obj)
 {
     if (!s) return -1;
-    unsigned int hash = (unsigned int)ele%HASH_MAX;
+    unsigned int hash = (unsigned int)obj%HASH_MAX;
     struct node **pnodep = &s->_hash[hash];
     while (*pnodep && (*pnodep)->valid) {
-        if (0 == s->cmp(ele, (*pnodep)->ele))
+        if (0 == s->cmp(obj, (*pnodep)->obj))
             return 0;
         pnodep = &(*pnodep)->next;
     }
@@ -82,20 +84,21 @@ extern int set_add(set_t s, void *ele)
         *pnodep = malloc(sizeof(struct node));
         (*pnodep)->next = NULL;
     }
-    (*pnodep)->ele = ele;
+    (*pnodep)->obj = obj;
     (*pnodep)->valid = 1;
+    (*pnodep)->_iter_id = s->_iter_id;
     s->size++;
     return 0;
 }
 
-extern int set_remove(set_t s, void const *hint)
+extern int set_remove(set_t s, void *hint)
 {
     if (!s) return -1;
     unsigned int hash = (unsigned int)hint%HASH_MAX;
     struct node **pnodep = &s->_hash[hash];
     while (*pnodep) {
-        if ((*pnodep)->valid && !s->cmp(hint, (*pnodep)->ele)) {
-            s->free? s->free(&(*pnodep)->ele): 0;
+        if ((*pnodep)->valid && !s->cmp(hint, (*pnodep)->obj)) {
+            //s->free? s->free(&(*pnodep)->obj): 0;
             (*pnodep)->valid = 0;
             s->size--;
 
@@ -117,6 +120,7 @@ extern void set_gc(T s)
 int set_start(set_t s)
 {
     if (!s) return -1;
+    s->_iter_id++;
     s->_iter_hash_idx = 0;
     s->_iter_node = s->_hash[0];
 
@@ -126,13 +130,13 @@ int set_start(set_t s)
  * return: 0: the end iterating
  *        !0: iterate
  */
-int set_iterate(set_t s, void **ele)
+int set_iterate(set_t s, void **pobj)
 {
-    if (!s) return 0;
+    if (!s || !pobj) return 0;
     for (;;) {
         for (; s->_iter_node; s->_iter_node = s->_iter_node->next) {
-            if (s->_iter_node->valid) {
-                *ele = s->_iter_node->ele;
+            if (s->_iter_node->valid && (s->_iter_id != s->_iter_node->_iter_id)) {
+                *pobj = s->_iter_node->obj;
                 s->_iter_node = s->_iter_node->next;
                 return 1;
             }

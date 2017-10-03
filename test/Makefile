@@ -15,7 +15,8 @@ test-set: test-set.c.o ../set.c.o
 test-worker: test-worker.c.o \
 	../worker.c.o ../log.c.o ../common.c.o ../connection.c.o ../set.c.o ../http.c.o
 	$(CC) -o $@ $^ $(LDFLAGS)
-test-http: test-http.c.o
+test-http: test-http.c.o \
+	../worker.c.o ../log.c.o ../common.c.o ../connection.c.o ../set.c.o ../http.c.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.c.o: %.c

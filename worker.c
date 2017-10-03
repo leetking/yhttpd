@@ -22,7 +22,7 @@ extern int run_worker(int const sfd)
     int ret = 0;
     struct connection *con;
     fd_set rdset, wrset;
-    set_t set = set_create(sizeof(con), NULL, (free_t*)connection_destory);
+    set_t set = set_create(NULL, (free_t*)connection_destory);
 
     if (!set) {
         _M(LOG_DEBUG2, "init set error.\n");

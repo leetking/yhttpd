@@ -17,9 +17,10 @@ int main()
     struct sockaddr_in sip;
     memset(&sip, 0, sizeof(sip));
     sip.sin_family = AF_INET;
-    sip.sin_port = htons(80);
+    sip.sin_port = htons(8080);
     sip.sin_addr.s_addr = htonl(INADDR_ANY);
 
+    printf("Listing on: %d\n", 8080);
     int on = 1;
     if (-1 == setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))) {
         perror("setsockopt");

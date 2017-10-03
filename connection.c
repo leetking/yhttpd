@@ -87,8 +87,7 @@ extern int connection_read(struct connection *c)
 {
     if (!c) return -1;
     if (!c->_http_req) {
-        c->_http_req = malloc(sizeof(struct http_request)+HTTP_METADATA_LEN);
-        c->_http_req->_ps_status = HTTP_PARSE_INIT;
+        c->_http_req = http_request_malloc(HTTP_METADATA_LEN);
         if (!c->_http_req)
             return 1;
     }
@@ -172,7 +171,7 @@ extern int connection_isvalid(struct connection const *c)
 extern void connection_destory(struct connection **c)
 {
     if (!c || !*c) return;
-    free((*c)->_http_req);
+    http_request_free(&(*c)->_http_req);
     close((*c)->sktfd);
     if (-1 != (*c)->nrmfd)
         close((*c)->nrmfd);
