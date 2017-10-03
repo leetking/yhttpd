@@ -7,7 +7,7 @@
 #include "common.h"
 #include "http.h"
 
-//#define LOCAL_TEST
+/* #define LOCAL_TEST */
 
 #ifdef LOCAL_TEST
 # define _D(...) printf(__VA_ARGS__)

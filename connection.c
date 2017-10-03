@@ -1,8 +1,11 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
 
 #include <linux/limits.h>
 
@@ -39,23 +42,39 @@ extern struct connection *connection_create(int sktfd)
     return con;
 }
 
-static int connection_response(struct connection *c)
+static int check_nrm_file(struct connection *c)
 {
     _M(LOG_DEBUG2, "method: %d\nuri: %.*s\nhost: %.*s\n",
             c->_http_req->method,
             c->_http_req->lines[HTTP_URI].len, c->_http_req->lines[HTTP_URI].str,
             c->_http_req->lines[HTTP_HOST].len, c->_http_req->lines[HTTP_HOST].str);
-    char index[] = "HTTP/1.1 200 OK"CRLF
-                   "Server: yhttpd"CRLF
-                   CRLF
-                   "<html><head></head><body><h1>200 OK</h1><p>This is index.html</p></body></html>";
     char path[PATH_MAX] = ".";
-    strncpy(path, c->_http_req->lines[HTTP_URI].str, c->_http_req->lines[HTTP_URI].len);
+    strncat(path, c->_http_req->lines[HTTP_URI].str, c->_http_req->lines[HTTP_URI].len);
 
+    _M(LOG_DEBUG2, "full request path: %s\n", path);
     /* index.html */
     if ('/' == path[1]) {
         write(c->sktfd, index, sizeof(index)-1);
     }
+    c->nrmfd = open(path, O_RDONLY);
+    if (-1 == c->nrmfd) {
+        _M(LOG_DEBUG2, "check_nrm_file: %s", strerror(errno));
+    }
+    return 0;
+}
+
+static int connection_response(struct connection *c)
+{
+    char head[] = "HTTP/1.1 200 OK"CRLF
+                   "Server: yhttpd"CRLF
+                   CRLF;
+
+    if (-1 != write(c->sktfd, head, sizeof(head)-1)) {
+        _M(LOG_DEBUG2, "response 200 OK\n");
+        return 0;
+    }
+
+    /* TODO connection 分离传输环形缓冲区 */
 
     c->_status = CON_CLOSE;
 
@@ -67,6 +86,7 @@ extern int connection_write(struct connection *c)
     if (!c) return -1;
     switch (c->_status) {
     case CON_REQ_FIN:
+        check_nrm_file(c);
         connection_response(c);
         break;
 

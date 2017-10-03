@@ -1,8 +1,8 @@
 #include "set.h"
 #include <stdint.h>
 
-/* #define HASH_MAX   (9973) */
-#define HASH_MAX   (7)
+#define HASH_MAX   (9973)
+/* #define HASH_MAX   (7) */
 
 struct node {
     void *obj;

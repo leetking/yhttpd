@@ -4,11 +4,16 @@
 #include <unistd.h>
 #include <netinet/ip.h>
 #include <sys/socket.h>
+#include <fcntl.h>
+#include <semaphore.h>
 
 #include "../worker.h"
+#include "../common.h"
+#include "../log.h"
 
 int main()
 {
+    yhttp_log_set(LOG_DEBUG2);
     int sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (-1 == sfd) {
         perror("socket");
@@ -39,7 +44,17 @@ int main()
         close(sfd);
         return 1;
     }
+
+    sem_t *sem = sem_open(ACCEPT_LOCK, O_CREAT, 0644, 1);
+    if (SEM_FAILED == sem) {
+        perror("init lock");
+        goto err;
+    }
+
     run_worker(sfd);
+
+err:
+    sem_unlink(ACCEPT_LOCK);
 
     return 0;
 }

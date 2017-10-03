@@ -35,6 +35,7 @@ extern int run_worker(int const sfd)
         return 1;
     }
     set_add(set, con);
+    _M(LOG_DEBUG2, "open sem at %s\n", ACCEPT_LOCK);
     sem_t *sem = sem_open(ACCEPT_LOCK, O_EXCL);
     if (sem == SEM_FAILED) {
         _M(LOG_DEBUG2, "worker sem: %s\n", strerror(errno));
@@ -105,6 +106,7 @@ extern int run_worker(int const sfd)
             }
             /* finish a transfer */
             if (!connection_isvalid(con)) {
+                _M(LOG_DEBUG2, "Finish a connection %d %d\n", con->sktfd, con->nrmfd);
                 set_remove(set, con);
                 connection_destory(&con);
             }

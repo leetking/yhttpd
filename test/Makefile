@@ -1,6 +1,6 @@
 CC := gcc
 
-CFLAGS  := -g3 -Wall -O0 -MMD -MP -I../
+CFLAGS  := -g3 -Wall -O0 -MMD -MP -I../ -DVER=\"test\"
 LDFLAGS := -lpthread
 
 SRCS := $(wildcard *.c ../*.c)
