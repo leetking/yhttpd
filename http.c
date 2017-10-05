@@ -15,9 +15,9 @@
 # define _D(...) ((void)0)
 #endif /* LOCAL_TEST */
 
-extern struct http_request *http_request_malloc(size_t metadatalen)
+extern struct http_head *http_head_malloc(size_t metadatalen)
 {
-    struct http_request *ret;
+    struct http_head *ret;
     ret = malloc(sizeof(*ret)+metadatalen);
     if (!ret) return NULL;
     ret->_ps_status = HTTP_PARSE_INIT;
@@ -25,14 +25,18 @@ extern struct http_request *http_request_malloc(size_t metadatalen)
     ret->_metadatalen = metadatalen;
     return ret;
 }
-extern void http_request_free(struct http_request **req)
+extern void http_head_free(struct http_head **req)
 {
     if (!req || !*req) return;
     free(*req);
     *req = NULL;
 }
 
-extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssize_t len)
+/**
+ * return: 1: parse continue
+ *         0: parse finish or error, must interrupt parse and close fd
+ */
+extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t len)
 {
     /* 解析请求 */
     enum {
@@ -56,6 +60,7 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
     enum {
         HTTP_LINE_EXT_CON  = HTTP_LINE_MAX,
         HTTP_LINE_EXT_RANGE,
+        HTTP_LINE_EXT_CONT_LEN,
 
         HTTP_LINE_EXT_IGN,
     };
@@ -67,8 +72,10 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
         case PS_START:
             if (CR == *p || LF == *p)
                 break;
-            if (!isupper(*p))
-                return HTTP_REQ_INVALID;
+            if (!isupper(*p)) {
+                req->status_code = HTTP_404;
+                return 0;
+            }
             req->_ps_status = PS_METHOD;
             req_start = p;
             break;
@@ -81,31 +88,41 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                         req->method = HTTP_GET;
                     else if (!strncmp("PUT", (char*)req_start, 3))
                         req->method = HTTP_PUT;
-                    else
-                        return HTTP_REQ_INVALID;
+                    else {
+                        /* TODO add status code */
+                        req->status_code = HTTP_404;
+                        return 0;
+                    }
                     break;
                 case 4: /* POST, HEAD */
                     if (!strncmp("POST", (char*)req_start, 4))
                         req->method = HTTP_POST;
                     else if (!strncmp("HEAD", (char*)req_start, 4))
                         req->method = HTTP_HEAD;
-                    else
-                        return HTTP_REQ_INVALID;
+                    else {
+                        req->status_code = HTTP_404;
+                        return 0;
+                    }
                     break;
 
                 default:
-                    return HTTP_REQ_INVALID;
+                    req->status_code = HTTP_404;
+                    return 0;
                 }
                 req->_ps_status = PS_URI_BF;
-            } else if (!isupper(*p))
-                return HTTP_REQ_INVALID;
+            } else if (!isupper(*p)) {
+                req->status_code = HTTP_404;
+                return 0;
+            }
             break;
 
         case PS_URI_BF:
             if (' ' == *p)
                 break;
-            if ('/' != *p)
-                return HTTP_REQ_INVALID;
+            if ('/' != *p) {
+                req->status_code = HTTP_404;
+                return 0;
+            }
             req_start = p;
             req->_ps_status = PS_URI_IN;
             break;
@@ -114,8 +131,11 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
             if (' ' == *p) {
                 int rest = req->_metadatalen - req->_metadataidx;
                 int len = MIN(p - req_start, rest);
-                if (len <= 0)
-                    return HTTP_REQ_INVALID;    /* to long! */
+                if (len <= 0) {
+                    /* to long! */
+                    req->status_code = HTTP_404;
+                    return 0;
+                }
                 req->lines[HTTP_URI].str = (char*)req->_metadata + req->_metadataidx;
                 req->lines[HTTP_URI].len = len;
                 memcpy(req->_metadata + req->_metadataidx, req_start, len);
@@ -129,16 +149,20 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
         case PS_VERSION_BF:
             if (' ' == *p)
                 break;
-            if ('H' != *p)
-                return HTTP_REQ_INVALID;
+            if ('H' != *p) {
+                req->status_code = HTTP_404;
+                return 0;
+            }
             req_start = p;
             req->_ps_status = PS_VERSION_IN;
             break;
 
         case PS_VERSION_IN:
             if (CR == *p) {
-                if ((8 != (p-req_start)) || (0 != strncmp("HTTP/", (char*)req_start, 5)))
-                    return HTTP_REQ_INVALID;
+                if ((8 != (p-req_start)) || (0 != strncmp("HTTP/", (char*)req_start, 5))) {
+                    req->status_code = HTTP_404;
+                    return 0;
+                }
                 req_start = req_start+5;
                 if (!strncmp("0.9", (char*)req_start, 3))
                     req->ver = HTTP09;
@@ -147,16 +171,20 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                 else if (!strncmp("1.1", (char*)req_start, 3)) {
                     req->ver = HTTP11;
                     req->iscon = 1;     /* default is keep-alive */
-                } else
-                    return HTTP_REQ_INVALID;
+                } else {
+                    req->status_code = HTTP_404;
+                    return 0;
+                }
             }
             if (LF == *p)
                 req->_ps_status = PS_Host_BF;
             break;
 
         case PS_Host_BF:    /* keyword "Host" */
-            if ('h' != tolower(*p))
-                return HTTP_REQ_INVALID;
+            if ('h' != tolower(*p)) {
+                req->status_code = HTTP_404;
+                return 0;
+            }
             req_start = p;
             req->_ps_status = PS_Host_IN;
             break;
@@ -165,8 +193,9 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
             if (':' == *p) {
                 if ((4 == p - req_start) && (!strncasecmp("Host", (char*)req_start, 4)))
                     req->_ps_status = PS_host_bf;
-                else
-                    return HTTP_REQ_INVALID;
+                else {
+                    req->status_code = HTTP_404;
+                }
             }
             break;
 
@@ -181,8 +210,10 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
             if (CR == *p) {
                 int rest = req->_metadatalen - req->_metadataidx;
                 int len = MIN(p - req_start, rest);
-                if (len <= 0)
-                    return HTTP_REQ_INVALID;    /* to long! */
+                if (len <= 0) {
+                    req->status_code = HTTP_404;
+                    return 0;    /* to long! */
+                }
                 req->lines[HTTP_HOST].str = (char*)req->_metadata + req->_metadataidx;
                 req->lines[HTTP_HOST].len = len;
                 memcpy(req->_metadata + req->_metadataidx, req_start, len);
@@ -199,8 +230,10 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                 req->_fin_lf = 1;
                 break;
             }
-            if (req->_fin_lf && LF == *p)
-                return HTTP_REQ_FINISH;
+            if (req->_fin_lf && LF == *p) {
+                req->status_code = HTTP_200;
+                return 0;
+            }
 
             if (isalpha(*p) || '-' == *p || '_' == *p) {
                 req_start = p;
@@ -218,6 +251,7 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                     { { "Referer",          7,  }, HTTP_REFERER, },
                     { { "User-Agent",       10, }, HTTP_UA,  },
                     { { "Accept",           6,  }, HTTP_ACCEPT, },
+                    { { "Content-Length",   14, }, HTTP_LINE_EXT_CONT_LEN, },
                     { { "Accept-Encoding",  15, }, HTTP_ACCEPT_ENCODING, },
                     { { "Accept-Language",  15, }, HTTP_ACCEPT_LANGUAGE, },
                     { { "Range",            5,  }, HTTP_LINE_EXT_RANGE, },
@@ -242,8 +276,10 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                     req->_ps_status = PS_VALUE_BF;
                 }
 
-            } else if (!(isalpha(*p) || '-' == *p || '_' == *p))
-                return HTTP_REQ_INVALID;
+            } else if (!(isalpha(*p) || '-' == *p || '_' == *p)) {
+                req->status_code = HTTP_404;
+                return 0;
+            }
             break;
 
         case PS_VALUE_BF:
@@ -268,6 +304,11 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                         req->iscon = 0;
                     break;
 
+                case HTTP_LINE_EXT_CONT_LEN:
+                    _D("value: HTTP_LINE_EXT_CONT_LEN\n");   /* TODO http.c parse content-length */
+
+                    break;
+
                 case HTTP_LINE_EXT_IGN:
                     _D("value: HTTP_LINE_EXT_IGN(%.*s)\n", (int)(p-req_start), req_start);
                     break;
@@ -276,8 +317,10 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
                     rest = req->_metadatalen - req->_metadataidx;
                     len = MIN(p - req_start, rest);
                     _D("value: %.*s\n", len, req_start);
-                    if (len <= 0)
-                        return HTTP_REQ_INVALID;    /* to long! */
+                    if (len <= 0) {
+                        req->status_code = HTTP_404;
+                        return 0;    /* to long! */
+                    }
                     req->lines[req->_line_type].str = (char*)req->_metadata + req->_metadataidx;
                     req->lines[req->_line_type].len = len;
                     memcpy(req->_metadata + req->_metadataidx, req_start, len);
@@ -291,5 +334,6 @@ extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssi
         }
     }
 
-    return HTTP_REQ_CONTINUE;
+    /* parse continue */
+    return 1;
 }

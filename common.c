@@ -1,10 +1,15 @@
+#include <unistd.h>
 #include "common.h"
 
-ssize_t writen(int fd, uint8_t const *buff, ssize_t n)
+char root_path[PATH_MAX] = ".";
+char cgi_path[PATH_MAX] = ".";
+char err_codes_path[PATH_MAX] = ".";
+
+ssize_t write_s(int fd, uint8_t const *buff, ssize_t n)
 {
-    return n;
+    return write(fd, buff, n);
 }
-ssize_t readn(int fd, uint8_t const *buff, ssize_t n)
+ssize_t read_s(int fd, uint8_t *buff, ssize_t n)
 {
-    return n;
+    return read(fd, buff, n);
 }

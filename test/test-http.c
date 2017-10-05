@@ -4,10 +4,11 @@
 
 #include "../http.h"
 
-static void test_http_request(char const *reqstr, int len)
+static void test_http_head(char const *reqstr, int len)
 {
-    struct http_request *req = http_request_malloc(HTTP_METADATA_LEN);
-    assert(HTTP_REQ_FINISH == http_request_parse(req, (uint8_t*)reqstr, len));
+    struct http_head *req = http_head_malloc(HTTP_METADATA_LEN);
+    assert(0 == http_head_parse(req, (uint8_t*)reqstr, len));
+    assert(HTTP_200 == req->status_code);
 
     switch (req->method) {
     case HTTP_GET:    printf("method: GET\n"); break;
@@ -22,17 +23,18 @@ static void test_http_request(char const *reqstr, int len)
     printf("Ver: %d\n", req->ver);
     printf("Host: %.*s\n", req->lines[HTTP_HOST].len, req->lines[HTTP_HOST].str);
 
-    http_request_free(&req);
+    http_head_free(&req);
 }
 
-static void test_http_request1(void)
+static void test_http_head1(void)
 {
     printf("Testn http request 1\n");
     char reqstr[] = "GET / HTTP/1.1"CRLF
                     "Host: localhost:8080"CRLF
                     CRLF;
-    struct http_request *req = http_request_malloc(HTTP_METADATA_LEN);
-    assert(HTTP_REQ_FINISH == http_request_parse(req, (uint8_t*)reqstr, sizeof(reqstr)-1));
+    struct http_head *req = http_head_malloc(HTTP_METADATA_LEN);
+    assert(0 == http_head_parse(req, (uint8_t*)reqstr, sizeof(reqstr)-1));
+    assert(HTTP_200 == req->status_code);
 
     switch (req->method) {
     case HTTP_GET:    printf("method: GET\n"); break;
@@ -48,20 +50,21 @@ static void test_http_request1(void)
     printf("Host: %.*s\n", req->lines[HTTP_HOST].len, req->lines[HTTP_HOST].str);
     assert(req->iscon);
 
-    http_request_free(&req);
+    http_head_free(&req);
     printf("\n");
 }
 
-static void test_http_request2(void)
+static void test_http_head2(void)
 {
     printf("Testn http request 2\n");
     char reqstr1[] = "GET /vim HTTP/1.1"CRLF;
     char reqstr2[] = "Host: localhost"CRLF CRLF;
 
-    struct http_request *req = http_request_malloc(HTTP_METADATA_LEN);
+    struct http_head *req = http_head_malloc(HTTP_METADATA_LEN);
 
-    assert(HTTP_REQ_CONTINUE == http_request_parse(req, (uint8_t*)reqstr1, strlen(reqstr1)));
-    assert(HTTP_REQ_FINISH == http_request_parse(req, (uint8_t*)reqstr2, strlen(reqstr2)));
+    assert(1 == http_head_parse(req, (uint8_t*)reqstr1, strlen(reqstr1)));
+    assert(0 == http_head_parse(req, (uint8_t*)reqstr2, strlen(reqstr2)));
+    assert(HTTP_200 == req->status_code);
 
     switch (req->method) {
     case HTTP_GET:    printf("method: GET\n"); break;
@@ -77,11 +80,11 @@ static void test_http_request2(void)
     printf("Host: %.*s\n", req->lines[HTTP_HOST].len, req->lines[HTTP_HOST].str);
     assert(req->iscon);
 
-    http_request_free(&req);
+    http_head_free(&req);
     printf("\n");
 }
 
-static void test_http_request3(void)
+static void test_http_head3(void)
 {
     printf("Test http request 3\n");
     char reqstr[] = "GET / HTTP/1.1"CRLF
@@ -95,14 +98,14 @@ static void test_http_request3(void)
                     "Accept-Encoding: gzip, deflate"CRLF
                     "Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.6,en;q=0.4,ja;q=0.2"CRLF
                     CRLF;
-    test_http_request(reqstr, strlen(reqstr));
+    test_http_head(reqstr, strlen(reqstr));
     printf("\n");
 }
 
 int main()
 {
-    test_http_request1();
-    test_http_request2();
-    test_http_request3();
+    test_http_head1();
+    test_http_head2();
+    test_http_head3();
     return 0;
 }

@@ -19,10 +19,19 @@ typedef struct string_st {
 typedef struct cookie_st {
 } cookie_t;
 
+/* parse status */
 enum {
-    HTTP_REQ_CONTINUE,
-    HTTP_REQ_INVALID,
+    HTTP_REQ_START,
+    HTTP_REQ_HEAD_FINISH,
+    HTTP_REQ_TRANSFER,
     HTTP_REQ_FINISH,
+    HTTP_REQ_NOP,
+
+    HTTP_RES_START,
+    HTTP_RES_TRANSFER,
+    HTTP_RES_FINISH,
+    HTTP_RES_NOP,
+    HTTP_RES_READ_FIN1,
 };
 #define HTTP_GET     0
 #define HTTP_POST    1
@@ -54,12 +63,20 @@ enum {
     HTTP_LINE_MAX,
 };
 
-struct http_request {
+/* status code */
+enum {
+    HTTP_200,   /* OK */
+    HTTP_404,
+};
+
+struct http_head {
     int8_t   method;
     int8_t   ver;
     string_t lines[HTTP_LINE_MAX];
+    int content_length;
     int range1, range2;
 
+    int status_code;
     uint8_t iscon:1;
     uint8_t ischunk:1;
     uint8_t _padding:5;
@@ -72,8 +89,8 @@ struct http_request {
     uint8_t _metadata[1];
 };
 
-extern struct http_request *http_request_malloc(size_t metadatalen);
-extern void http_request_free(struct http_request **req);
-extern int http_request_parse(struct http_request *req, uint8_t const *buff, ssize_t len);
+extern struct http_head *http_head_malloc(size_t metadatalen);
+extern void http_head_free(struct http_head **hd);
+extern int http_head_parse(struct http_head *hd, uint8_t const *buff, ssize_t len);
 
 #endif /* HTTP_H__ */

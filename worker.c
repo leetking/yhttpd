@@ -34,6 +34,7 @@ extern int run_worker(int const sfd)
         _M(LOG_DEBUG2, "create connection for sfd error!\n");
         return 1;
     }
+    connection_settimeout(con, -1);
     set_add(set, con);
     _M(LOG_DEBUG2, "open sem at %s\n", ACCEPT_LOCK);
     sem_t *sem = sem_open(ACCEPT_LOCK, O_EXCL);
@@ -50,18 +51,25 @@ extern int run_worker(int const sfd)
         int maxfd = sfd;
         set_foreach(set, con) {
             FD_SET(con->sktfd, &rdset);
-            if (sfd != con->sktfd)
+            if (sfd != con->sktfd && connection_need_write_skt(con))
                 FD_SET(con->sktfd, &wrset);
             maxfd = MAX(maxfd, con->sktfd);
-            if (-1 != con->nrmfd) {
-                FD_SET(con->nrmfd, &rdset);
-                FD_SET(con->nrmfd, &wrset);
-                maxfd = MAX(maxfd, con->nrmfd);
+            _M(LOG_DEBUG2, "select add sktfd %d\n", con->sktfd);
+            if (-1 != con->fdro) {
+                FD_SET(con->fdro, &rdset);
+                maxfd = MAX(maxfd, con->fdro);
+                _M(LOG_DEBUG2, "select add fdro %d\n", con->fdro);
+            }
+            if (-1 != con->fdwo && connection_need_write_file(con)) {
+                FD_SET(con->fdwo, &wrset);
+                maxfd = MAX(maxfd, con->fdwo);
+                _M(LOG_DEBUG2, "select add fdwo %d\n", con->fdwo);
             }
         }
+        _M(LOG_DEBUG2, "select maxfd %d\n", maxfd);
         int s = select(maxfd+1, &rdset, &wrset, NULL, NULL);
         if (-1 == s) {
-            _M(LOG_DEBUG2, "select: %s\n", strerror(errno));
+            _M(LOG_WARN, "select: %s\n", strerror(errno));
             continue;
         }
 
@@ -93,20 +101,22 @@ extern int run_worker(int const sfd)
 
             /* normal read */
             } else if (FD_ISSET(con->sktfd, &rdset)) {
-                connection_read(con);
+                connection_read_skt(con);
             /* normal write */
             } else if (FD_ISSET(con->sktfd, &wrset)) {
-                connection_write(con);
+                connection_write_skt(con);
 
             /* read, write file */
-            } else if (FD_ISSET(con->nrmfd, &rdset)) {
-                connection_read_nrm(con);
-            } else if (FD_ISSET(con->nrmfd, &wrset)) {
-                connection_write_nrm(con);
+            } else if (FD_ISSET(con->fdro, &rdset)) {
+                _M(LOG_DEBUG2, "fdro %d read_file\n", con->fdro);
+                connection_read_file(con);
+            } else if (FD_ISSET(con->fdwo, &wrset)) {
+                connection_write_file(con);
             }
             /* finish a transfer */
             if (!connection_isvalid(con)) {
-                _M(LOG_DEBUG2, "Finish a connection %d %d\n", con->sktfd, con->nrmfd);
+                _M(LOG_DEBUG2, "Finish a connection %d r: %d w: %d timeout: %d\n",
+                        con->sktfd, con->fdro, con->fdwo, con->timeout);
                 set_remove(set, con);
                 connection_destory(&con);
             }

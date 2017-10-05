@@ -13,10 +13,12 @@ test-log: test-log.c.o ../log.c.o
 test-set: test-set.c.o ../set.c.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 test-worker: test-worker.c.o \
-	../worker.c.o ../log.c.o ../common.c.o ../connection.c.o ../set.c.o ../http.c.o
+	../worker.c.o ../log.c.o ../common.c.o ../connection.c.o ../set.c.o ../http.c.o \
+	../ring-buffer.c.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 test-http: test-http.c.o \
-	../worker.c.o ../log.c.o ../common.c.o ../connection.c.o ../set.c.o ../http.c.o
+	../worker.c.o ../log.c.o ../common.c.o ../connection.c.o ../set.c.o ../http.c.o \
+	../ring-buffer.c.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.c.o: %.c

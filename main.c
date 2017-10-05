@@ -24,8 +24,6 @@
 
 static int as_deamon = 0;
 static int log = 0;
-static char root[PATH_MAX] = ".";
-static char cgi[PATH_MAX]  = ".";
 static uint16_t port = 80;
 
 static int works = WORKS;
@@ -34,11 +32,12 @@ static void help(int argc, char **argv)
 {
     printf("usage: %s [OPTION]\n"
            "xxx\n"
-           "      -r path    set root directory, default current directory(.)\n"
+           "      -r path    set `www` directory, default current directory(.)\n"
            "      -p port    specify a port, default 80\n"
            "      -d         run as daemon\n"
-           "      -e path    specify cgi directory, default current directory(.)\n"
-           "      -c num     create num number processer.\n"
+           "      -c path    specify `cgi` directory, default current directory(.)\n"
+           "      -w num     create num number worker process.\n"
+           "      -e path    specify `status-codes` file directory, default `$www/err-codes`\n"
            "      -l path    specify the log file.\n"
            "      -v <1,2,3> verbose.\n"
            "\n"
