@@ -31,7 +31,8 @@ static int works = WORKS;
 static void help(int argc, char **argv)
 {
     printf("usage: %s [OPTION]\n"
-           "xxx\n"
+           "a sample http server, for studing.\n"
+           "OPTIONS:"
            "      -r path    set `www` directory, default current directory(.)\n"
            "      -p port    specify a port, default 80\n"
            "      -d         run as daemon\n"
@@ -41,18 +42,37 @@ static void help(int argc, char **argv)
            "      -l path    specify the log file.\n"
            "      -v <1,2,3> verbose.\n"
            "\n"
-           "(c) %s\n",
-           argv[0], VER);
+           "%s %s\n"
+           "(c) GPL v3\n"
+           "Author: leetking <li_Tking@63.com>\n",
+           argv[0], argv[0], VER);
 }
-static void parse_opt(int argc, char **argv)
+static int parse_opt(int argc, char **argv)
 {
-    /* TODO parse option */
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "-r")) {
+        } else if (!strcmp(argv[i], "-p")) {
+        } else if (!strcmp(argv[i], "-d")) {
+        } else if (!strcmp(argv[i], "-c")) {
+        } else if (!strcmp(argv[i], "-w")) {
+        } else if (!strcmp(argv[i], "-e")) {
+        } else if (!strcmp(argv[i], "-l")) {
+        } else if (!strcmp(argv[i], "-v")) {
+        } else {
+            printf("");
+            return 1;
+        }
+    }
+    return 0;
 }
 
 int main(int argc, char **argv)
 {
+    /* FIXME remove yhttp_log_set(LOG_DEBUG2); */
     yhttp_log_set(LOG_DEBUG2);
-    parse_opt(argc, argv);
+
+    if (0 != parse_opt(argc, argv))
+        return 1;
 
     int ret = 0;
     int sfd;

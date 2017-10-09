@@ -2,5 +2,7 @@
 
 # test
 
-yhttpd -r www/ -p 8080 -e www/cgi/ -c 2 -d
+echo "test"
+
+#yhttpd -r www/ -p 8080 -e www/cgi/ -c 2 -d
 

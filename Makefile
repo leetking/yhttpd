@@ -21,15 +21,22 @@ DEPS := $(SRCS:.c=.c.d)
 OBJS := $(SRCS:.c=.c.o)
 
 $(APP): $(OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	@$(CC) -o $@ $^ $(LDFLAGS)
+	@echo "GEN $@"
 %.c.o: %.c
-	$(CC) -o $@ -c $^ $(CFLAGS)
-#-include $(DEPS)
+	@$(CC) -o $@ -c $^ $(CFLAGS)
+	@echo "CC  $@"
+-include $(DEPS)
 
 test:
+	@$(MAKE) -C tests
+	@( cd tests; ./run.sh )
 
 clean:
-	$(RM) $(OBJS) $(DEPS) $(APP)
+	@$(RM) $(OBJS) $(DEPS) $(APP)
+	@echo "RM $(OBJS)"
+	@echo "RM $(DEPS)"
+	@echo "RM $(APP)"
 
 distclean: clean
 

@@ -39,7 +39,7 @@ extern int run_worker(int const sfd)
     _M(LOG_DEBUG2, "open sem at %s\n", ACCEPT_LOCK);
     sem_t *sem = sem_open(ACCEPT_LOCK, O_EXCL);
     if (sem == SEM_FAILED) {
-        _M(LOG_DEBUG2, "worker sem: %s\n", strerror(errno));
+        _M(LOG_ERROR, "worker sem: %s\n", strerror(errno));
         ret = 1;
         goto set_err;
     }
