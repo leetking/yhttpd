@@ -7,7 +7,7 @@
 
 #include "log.h"
 
-#define BUFF_SIZE   (2048)
+#define BUFF_SIZE   (7)
 #define ACCEPT_LOCK "yhttp-" VER ".lock"
 #define TIMEOUT     (50)     /* s */
 

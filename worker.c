@@ -68,6 +68,7 @@ extern int run_worker(int const sfd)
         }
         _M(LOG_DEBUG2, "select maxfd %d\n", maxfd);
         int s = select(maxfd+1, &rdset, &wrset, NULL, NULL);
+        _M(LOG_DEBUG2, "select return %d\n", s);
         if (-1 == s) {
             _M(LOG_WARN, "select: %s\n", strerror(errno));
             continue;
@@ -99,26 +100,31 @@ extern int run_worker(int const sfd)
                 }
                 set_add(set, con);
 
-            /* normal read */
-            } else if (FD_ISSET(con->sktfd, &rdset)) {
-                connection_read_skt(con);
-            /* normal write */
-            } else if (FD_ISSET(con->sktfd, &wrset)) {
-                connection_write_skt(con);
+            } else {
+                /* normal read */
+                if (FD_ISSET(con->sktfd, &rdset)) {
+                    connection_read_skt(con);
+                }
+                /* normal write */
+                if (FD_ISSET(con->sktfd, &wrset)) {
+                    connection_write_skt(con);
 
-            /* read, write file */
-            } else if (FD_ISSET(con->fdro, &rdset)) {
-                _M(LOG_DEBUG2, "fdro %d read_file\n", con->fdro);
-                connection_read_file(con);
-            } else if (FD_ISSET(con->fdwo, &wrset)) {
-                connection_write_file(con);
-            }
-            /* finish a transfer */
-            if (!connection_isvalid(con)) {
-                _M(LOG_DEBUG2, "Finish a connection %d r: %d w: %d timeout: %d\n",
-                        con->sktfd, con->fdro, con->fdwo, con->timeout);
-                set_remove(set, con);
-                connection_destory(&con);
+                }
+                /* read, write file */
+                if (FD_ISSET(con->fdro, &rdset)) {
+                    _M(LOG_DEBUG2, "fdro %d read_file\n", con->fdro);
+                    connection_read_file(con);
+                }
+                if (FD_ISSET(con->fdwo, &wrset)) {
+                    connection_write_file(con);
+                }
+                /* finish a transfer */
+                if (!connection_isvalid(con)) {
+                    _M(LOG_DEBUG2, "Finish a connection %d r: %d w: %d timeout: %d\n",
+                            con->sktfd, con->fdro, con->fdwo, con->timeout);
+                    set_remove(set, con);
+                    connection_destory(&con);
+                }
             }
         }
     }
