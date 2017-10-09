@@ -66,7 +66,7 @@ static void response_prepare(struct connection *c)
     if (-1 == stat(uri, &st)) {
         _M(LOG_DEBUG2, "stat %s: %s\n", uri, strerror(errno));
         c->_res_status = HTTP_RES_TRANSFER;
-        c->_res_status = HTTP_404;
+        c->_http->status_code = HTTP_404;
         return;
     }
 
@@ -79,18 +79,30 @@ static void response_prepare(struct connection *c)
             _M(LOG_DEBUG2, "open %s: %s\n", uri, strerror(errno));
             /* server: I don't kown what happen. */
             c->_res_status = HTTP_RES_TRANSFER;
-            c->_res_status = HTTP_404;
+            c->_http->status_code = HTTP_404;
             return;
         }
         c->fdro = fd;
-        c->_res_status = HTTP_RES_TRANSFER;
+        c->_res_status = HTTP_RES_HEAD;
         _M(LOG_DEBUG2, "open %s: success %d\n", uri, fd);
     } else {
         /* no permission to open file */
         _M(LOG_DEBUG2, "response_transfer no permission open file.\n");
-        c->_res_status = HTTP_RES_TRANSFER;
-        c->_res_status = HTTP_404;
+        c->_res_status = HTTP_RES_HEAD;
+        c->_http->status_code = HTTP_404;
     }
+}
+static void response_head(struct connection *c)
+{
+    char header[] = "HTTP/1.1 200 OK"CRLF
+                    "Connection: close"CRLF
+                    "Content-Type: text/html"CRLF
+                    "Server: yhttpd/"VER CRLF
+                    CRLF;
+    int rdn = write_s(c->sktfd, (uint8_t*)header, sizeof(header)-1);
+    printf("response_head: rdn: %d\n", rdn);
+
+    c->_res_status = HTTP_RES_TRANSFER;
 }
 static void response_transfer(struct connection *c)
 {
@@ -109,6 +121,10 @@ extern int connection_write_skt(struct connection *c)
     switch (c->_res_status) {
     case HTTP_RES_START:
         response_prepare(c);
+        break;
+
+    case HTTP_RES_HEAD:
+        response_head(c);
         break;
 
     case HTTP_RES_READ_FIN1:
@@ -185,6 +201,7 @@ extern int connection_read_file(struct connection *c)
     _M(LOG_DEBUG2, "connection_read_file read: %d\n", rdn);
 
     if (rdn == 0) {
+        _M(LOG_DEBUG2, "connection_read_file read: finish.\n");
         c->_res_status = HTTP_RES_READ_FIN1;
     }
     return 0;
@@ -235,9 +252,9 @@ extern int connection_settimeout(struct connection *c, int timeout)
 
 extern int connection_need_write_skt(struct connection *c)
 {
-    if ((c->_res_status == HTTP_RES_TRANSFER
-            || c->_res_status == HTTP_RES_READ_FIN1)
-            && (c->_wri == c->_wrn))
+    if (c->_res_status == HTTP_RES_TRANSFER && c->_wri == c->_wrn)
+        return 0;
+    if (c->_con_status == CON_CLOSE)
         return 0;
     return 1;
 }

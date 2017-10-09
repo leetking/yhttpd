@@ -87,14 +87,14 @@ extern int run_worker(int const sfd)
                 if (-1 == sem_post(sem))
                     _M(LOG_DEBUG2, "sem_post: %s\n", strerror(errno));
                 if (-1 == cfd) {
-                    _M(LOG_DEBUG2, "accept: %s, ignore.\n", strerror(errno));
+                    _M(LOG_WARN, "accept: %s, ignore.\n", strerror(errno));
                     continue;
                 }
                 /* TODO record log */
                 maxfd = MAX(maxfd, cfd);
                 con = connection_create(cfd);
                 if (!con) {
-                    _M(LOG_DEBUG2, "Cant accept new connection. close(%d).\n", cfd);
+                    _M(LOG_WARN, "Cant accept new connection. close(%d).\n", cfd);
                     close(cfd); /* sorry, I cant accept */
                     continue;
                 }
@@ -111,11 +111,11 @@ extern int run_worker(int const sfd)
 
                 }
                 /* read, write file */
-                if (FD_ISSET(con->fdro, &rdset)) {
+                if (-1 != con->fdro && FD_ISSET(con->fdro, &rdset)) {
                     _M(LOG_DEBUG2, "fdro %d read_file\n", con->fdro);
                     connection_read_file(con);
                 }
-                if (FD_ISSET(con->fdwo, &wrset)) {
+                if (-1 != con->fdwo && FD_ISSET(con->fdwo, &wrset)) {
                     connection_write_file(con);
                 }
                 /* finish a transfer */

@@ -28,10 +28,11 @@ enum {
     HTTP_REQ_NOP,
 
     HTTP_RES_START,
+    HTTP_RES_HEAD,
     HTTP_RES_TRANSFER,
-    HTTP_RES_FINISH,
     HTTP_RES_NOP,
     HTTP_RES_READ_FIN1,
+    HTTP_RES_FINISH,
 };
 #define HTTP_GET     0
 #define HTTP_POST    1
