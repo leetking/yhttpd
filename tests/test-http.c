@@ -22,6 +22,7 @@ static void test_http_head(char const *reqstr, int len)
     printf("uri: %.*s\n", req->lines[HTTP_URI].len, req->lines[HTTP_URI].str);
     printf("Ver: %d\n", req->ver);
     printf("Host: %.*s\n", req->lines[HTTP_HOST].len, req->lines[HTTP_HOST].str);
+    printf("Connection: %d\n", req->iscon);
 
     http_head_free(&req);
 }
@@ -102,10 +103,23 @@ static void test_http_head3(void)
     printf("\n");
 }
 
+static void test_http_head4()
+{
+    printf("Test http request 4\n");
+    char reqstr[] = "GET / HTTP/1.1"CRLF
+                    "User-Agent: WebBench 1.5"CRLF
+                    "Host: 127.0.0.1"CRLF
+                    "Connection: close"CRLF
+                    CRLF;
+    test_http_head(reqstr, strlen(reqstr));
+    printf("\n");
+}
+
 int main()
 {
     test_http_head1();
     test_http_head2();
     test_http_head3();
+    test_http_head4();
     return 0;
 }

@@ -12,8 +12,9 @@ struct node {
 };
 
 struct set_t {
-    free_t *free;
-    cmp_t  *cmp;
+    free_t   *free;
+    cmp_t    *cmp;
+    hashfn_t *hashfn;
     int size;
 
     unsigned char _iter_id;
@@ -26,13 +27,18 @@ static int scmp(void const *x, void const *y)
 {
     return (intptr_t)x-(intptr_t)y;
 }
+static uint32_t shash(void const *obj)
+{
+    return (uintptr_t)obj & 0xffffffff;
+}
 
-extern set_t set_create(cmp_t *cmp, free_t *free)
+extern set_t set_create(cmp_t *cmp, free_t *free, hashfn_t *hashfn)
 {
     set_t s = calloc(1, sizeof(struct set_t) + HASH_MAX*sizeof(struct node*));
     if (!s) return NULL;
     s->free = free;
     s->cmp = cmp? cmp: scmp;
+    s->hashfn = hashfn? hashfn: shash;
     s->_iter_id = 0;
 
     return s;
@@ -47,7 +53,7 @@ extern void set_destory(set_t *s)
         struct node *pnext;
         while (pnode) {
             pnext = pnode->next;
-            (*s)->free? (*s)->free(&pnode->obj): 0;
+            (pnode->valid && (*s)->free)? (*s)->free(&pnode->obj): 0;
             free(pnode);
             pnode = pnext;
         }
@@ -73,12 +79,11 @@ extern int set_size(set_t s)
 extern int set_add(set_t s, void *obj)
 {
     if (!s) return -1;
-    unsigned int hash = (unsigned int)obj%HASH_MAX;
+    uint32_t hash = s->hashfn(obj)%HASH_MAX;
     struct node **pnodep = &s->_hash[hash];
-    while (*pnodep && (*pnodep)->valid) {
+    for (; *pnodep && (*pnodep)->valid; pnodep = &(*pnodep)->next) {
         if (0 == s->cmp(obj, (*pnodep)->obj))
-            return 0;
-        pnodep = &(*pnodep)->next;
+            return 1;
     }
     if (!*pnodep) {
         *pnodep = malloc(sizeof(struct node));
@@ -94,17 +99,16 @@ extern int set_add(set_t s, void *obj)
 extern int set_remove(set_t s, void *hint)
 {
     if (!s) return -1;
-    unsigned int hash = (unsigned int)hint%HASH_MAX;
+    uint32_t hash = s->hashfn(hint)%HASH_MAX;
     struct node **pnodep = &s->_hash[hash];
-    while (*pnodep) {
+    for (; *pnodep; pnodep = &(*pnodep)->next) {
         if ((*pnodep)->valid && !s->cmp(hint, (*pnodep)->obj)) {
-            //s->free? s->free(&(*pnodep)->obj): 0;
+            s->free? s->free(&(*pnodep)->obj): 0;
             (*pnodep)->valid = 0;
             s->size--;
 
             return 0;
         }
-        pnodep = &(*pnodep)->next;
     }
 
     /* not found */

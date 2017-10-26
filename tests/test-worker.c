@@ -25,7 +25,7 @@ int main()
     sip.sin_port = htons(8080);
     sip.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    printf("Listing on: %d\n", 8080);
+    printf("Listing on: 0.0.0.0:%d\n", 8080);
     int on = 1;
     if (-1 == setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))) {
         perror("setsockopt");

@@ -66,8 +66,46 @@ enum {
 
 /* status code */
 enum {
-    HTTP_200,   /* OK */
-    HTTP_404,
+    HTTP_200 = 0, /* OK */
+
+    HTTP_202,     /* Accept */
+    HTTP_301,     /* Moved Permanently */
+
+    HTTP_400,     /* Bad Request */
+    HTTP_403,     /* Forbidden */
+    HTTP_404,     /* Not Found */
+    HTTP_405,     /* Method Not Allowed */
+    HTTP_413,     /* Request Entity Too Large */
+    HTTP_414,     /* Request-URI TOo Large */
+    HTTP_415,     /* Unsupported Media Type */
+    HTTP_416,     /* Requested range not statisfiable */
+
+    HTTP_500,     /* Internal Server Error */
+    HTTP_501,     /* Not Implemented */
+    HTTP_505,     /* HTTP Version not supported */
+
+    HTTP_CODE_MAX,
+};
+
+static char const * http_code_str[] = {
+    "OK",
+    "Accept",
+};
+
+struct http_req {
+    int8_t method;
+    int8_t version;
+    string_t lines[HTTP_LINE_MAX];
+    int content_length;
+    int range1, range2;
+
+    uint8_t iscon:1;
+    uint8_t ischunk:1;
+};
+
+struct http_res {
+    int8_t code;
+    int8_t version;
 };
 
 struct http_head {
@@ -76,6 +114,8 @@ struct http_head {
     string_t lines[HTTP_LINE_MAX];
     int content_length;
     int range1, range2;
+
+    int filesize;
 
     int status_code;
     uint8_t iscon:1;

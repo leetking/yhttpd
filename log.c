@@ -4,7 +4,7 @@
 
 #include "log.h"
 
-static int level = 1;
+static int level = 2;
 
 extern void yhttp_log_set(int l)
 {
@@ -14,7 +14,7 @@ extern void yhttp_log_set(int l)
 
 extern void yhttp_log(int l, char const *str, ...)
 {
-    if (l > level) return;
+    if (l > level || l < LOG_ERROR) return;
     char buff[] = "1970-01-01 00:00:00";
     time_t rawtime;
     struct tm *timeinfo;
@@ -22,16 +22,13 @@ extern void yhttp_log(int l, char const *str, ...)
     timeinfo = localtime(&rawtime);
     if (timeinfo)
         strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M:%S", timeinfo);
-    printf("%s ", buff);
     static char const *strlevel[] = {
-        "[INFO]  ", "[ERROR] ",
-        "[WARN]  ", "[DEBUG1]",
+        "[ERROR] ", "[WARN]  ",
+        "[INFO]  ", "[DEBUG1]",
         "[DEBUG2]",
     };
-    if (l < LOG_INFO || l > LOG_DEBUG2)
-        printf("[ALL]   ");
-    else
-        printf("%s ", strlevel[l]);
+    printf("%s ", buff);
+    printf("%s ", strlevel[l]);
     va_list ap;
     va_start(ap, str);
     vprintf(str, ap);

@@ -2,9 +2,9 @@
 #define LOG_H__
 
 enum {
-    LOG_INFO   = 0,
-    LOG_ERROR  = 1,
-    LOG_WARN   = 2,
+    LOG_ERROR  = 0,
+    LOG_WARN   = 1,
+    LOG_INFO   = 2,
     LOG_DEBUG  = 3,
     LOG_DEBUG2 = 4,
 };

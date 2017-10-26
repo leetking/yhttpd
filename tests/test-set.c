@@ -13,12 +13,25 @@ void stu_free(struct stu **pobjp)
     assert(pobjp);
     assert(*pobjp);
     free((*pobjp)->name);
+    free(*pobjp);
+    *pobjp = NULL;
 }
 int stu_cmp(struct stu const *a, struct stu const *b)
 {
     if (!strcmp(a->name, b->name) && (a->age == b->age))
         return 0;
     return 1;
+}
+uint32_t str_hash(char const *str)
+{
+    uint32_t hash = 0;
+    for (; *str; str++)
+        hash = hash*31+*str;
+    return hash;
+}
+uint32_t stu_hash(struct stu const *obj)
+{
+    return str_hash(obj->name) ^ obj->age;
 }
 struct stu *stu_new(char const *name, int age)
 {
@@ -38,8 +51,8 @@ char *stu_str(struct stu const *s)
 
 static void test_set_obj(void)
 {
-    const int CNT = 10000;
-    set_t set = set_create((cmp_t*)stu_cmp, (free_t*)stu_free);
+    const int CNT = 1000000;
+    set_t set = set_create((cmp_t*)stu_cmp, (free_t*)stu_free, (hashfn_t*)stu_hash);
     assert(set);
     assert(0 == set_size(set));
     assert(set_isempty(set));
@@ -65,12 +78,18 @@ static void test_set_obj(void)
         assert(cnt == CNT);
     }
 
+    struct stu hint;
+    hint.name = "0-name";
+    hint.age  = 0;
+    set_remove(set, &hint);
+    assert(CNT-1 == set_size(set));
+
     set_destory(&set);
 }
 
 static void test_set_order(void)
 {
-    set_t set = set_create((cmp_t*)stu_cmp, (free_t*)stu_free);
+    set_t set = set_create((cmp_t*)stu_cmp, (free_t*)stu_free, (hashfn_t*)stu_hash);
     char buff[46];
 
     set_add(set, stu_new("0-name", 0));
@@ -97,7 +116,6 @@ static void test_set_order(void)
     cnt = 0;
     set_foreach(set, stu) {
         set_remove(set, stu);
-        stu_free(&stu);
         cnt++;
     }
     printf("cnt: %d == 2\n", cnt);

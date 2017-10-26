@@ -9,12 +9,13 @@ MKDIR := mkdir -p
 CFLAGS  := -DVER=\"$(VER)\" -MMD -MP
 LDFLAGS := -lpthread
 
-CFLAGS_DEBUG    := -g3 -O0 -DDEBUG -Wall -Wformat
-LDFLAGS_DEBUG   :=
+CFLAGS_DEBUG    := -g3 -O0 -DDEBUG -Wall -Wformat -fsanitize=address
+LDFLAGS_DEBUG   := -fsanitize=address
 CFLAGS_RELEASE  := -O2 -DNDEBUG
 LDFLAGS_RELEASE :=
 
-CFLAGS += $(CFLAGS_DEBUG)
+CFLAGS  += $(CFLAGS_DEBUG)
+LDFLAGS += $(LDFLAGS_DEBUG)
 
 SRCS := $(wildcard *.c)
 DEPS := $(SRCS:.c=.c.d)
@@ -30,7 +31,7 @@ $(APP): $(OBJS)
 
 test:
 	@$(MAKE) -C tests
-	@( cd tests; ./run.sh )
+	@( cd tests; ./test.sh )
 
 clean:
 	@$(RM) $(OBJS) $(DEPS) $(APP)

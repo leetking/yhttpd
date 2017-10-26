@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <netinet/ip.h>
 
 #include <linux/limits.h>
 
@@ -14,6 +15,7 @@
 #include "http.h"
 #include "connection.h"
 #include "ring-buffer.h"
+#include "event.h"
 
 enum con_status {
     CON_INIT,
@@ -27,36 +29,252 @@ enum con_status {
 #define next(idx, size)     (((idx)+1)%(size))
 #define nextn(idx, n, size) (((idx)+(n))%(size))
 
+static void read_from_normalfd(struct connection *c);
+static void write_to_normalfd(struct connection *c);
+static void read_request_content(struct connection *c);
+static void respond_header(struct connection *c);
+static void prepare_response(struct connection *c);
+static void write_to_socket(struct connection *c);
+
+/**
+ * SOME THINGS OF BUFFERS WHICH YOU SHOULD KNWON
+ *
+ * sktfd --read--> [ rdbuff ] --write-> fdwo
+ * sktfd <-write-- [ wrbuff ] <--read-- fdro
+ *
+ * Figure 1
+ */
+
+/**
+ * write to socket (respond)
+ */
+static void write_to_socket(struct connection *c)
+{
+    if (ringbuffer_empty(c->wrbuff) && c->socket.wrreg) {
+        c->socket.wrreg = 0;
+        event_del(c->socket.fd, EVENT_WRITE);
+        return;
+    }
+
+    int wrn = ringbuffer_write(c->socket.fd, c->wrbuff);
+    if (wrn <= 0) {
+        c->socket.wreof = 1;
+        event_del(c->socket.fd, EVENT_WRITE);
+        return;
+    }
+
+    c->socket.wrn += wrn;
+    _M(LOG_DEBUG2, "write_to_socket(): wrn: %d wrmax: %d\n", c->socket.wrn, c->socket.wrmax);
+    if (c->socket.wrn == c->socket.wrmax) {
+        c->socket.wrn = c->socket.wrmax = 0;
+        c->socket.wrreg = 0;
+        c->socket.wreof = 1;
+        event_del(c->socket.fd, EVENT_WRITE);
+        if (connection_a_tx(c)) {
+            if (c->http->iscon) {
+                _M(LOG_DEBUG2, "write_to_socket(): a new request maybe.\n");
+                /* A new request maybe */
+                c->socket.rdeof = 0;
+                event_add(c->socket.fd, EVENT_READ, (event_fun_t*)parse_request, c);
+            } else {
+                _M(LOG_DEBUG2, "write_to_socket(): finish a transcation.\n");
+                connection_destory(&c);
+            }
+        }
+    }
+}
+
+/**
+ * read from the normal fd which maybe is pipe or regular file
+ */
+static void read_from_normalfd(struct connection *c)
+{
+    /* Ref: Figure 1 */
+    if (ringbuffer_full(c->wrbuff) && c->normal.rdreg) {
+        c->normal.rdreg = 0;
+        event_del(c->normal.fdro, EVENT_READ);
+        return;
+    }
+    int rdn = ringbuffer_read(c->normal.fdro, c->wrbuff);
+    _M(LOG_DEBUG2, "read_from_normalfd(): rdn: %d\n", rdn);
+
+    if (rdn <= 0) {
+        c->normal.rdeof = 1;
+        event_del(c->normal.fdro, EVENT_READ);
+        close(c->normal.fdro);
+        c->normal.fdro = -1;
+    } else {
+        c->normal.rdn += rdn;
+        if (c->normal.rdn == c->normal.rdmax) {
+            _M(LOG_DEBUG2, "read_from_normalfd(): read %d over\n", c->normal.fdro);
+            c->normal.rdn = c->normal.rdmax = 0;
+            c->normal.rdeof = 1;
+            event_del(c->normal.fdro, EVENT_READ);
+            close(c->normal.fdro);
+            c->normal.fdro = -1;
+        }
+    }
+
+    /* register write event to socket */
+    if (!ringbuffer_empty(c->wrbuff) && !c->socket.wrreg) {
+        _M(LOG_DEBUG2, "read_from_normalfd(): register write_to_socket\n");
+        c->socket.wreof = 0;
+        c->socket.wrreg = 1;
+        event_add(c->socket.fd, EVENT_WRITE, (event_fun_t*)write_to_socket, c);
+    }
+}
+
+/**
+ * write the content from rdbuff to the input of cgi
+ */
+static void write_to_normalfd(struct connection *c)
+{
+}
+
+
+/**
+ * read the content from socket
+ */
+static void read_request_content(struct connection *c)
+{
+    /* full, not need read */
+    if (ringbuffer_full(c->rdbuff) && c->socket.wrreg) {
+        c->socket.wrreg = 0;
+        event_del(c->socket.fd, EVENT_READ);
+        return;
+    }
+
+    int rdn = ringbuffer_read(c->socket.fd, c->rdbuff);
+    /* finish */
+    if (rdn == 0) {
+        event_del(c->socket.fd, EVENT_READ);
+        c->socket.rdeof = 1;
+        return;
+    }
+
+    /* error */
+    if (rdn < 0) {
+        return;
+    }
+
+    if (!ringbuffer_empty(c->rdbuff) && !c->normal.wrreg) {
+        c->normal.wrreg = 1;
+        event_add(c->normal.fdwo, EVENT_WRITE, (event_fun_t*)write_to_normalfd, c);
+        return;
+    }
+}
+static void respond_header(struct connection *c)
+{
+    /* Ref: Figure 1 */
+    char header[] = "HTTP/1.1 200 OK"CRLF
+        "Connection: Keey-Alive" CRLF
+        "Content-Type: text/html"CRLF
+        "Content-Length: %d" CRLF
+        "Server: yhttpd/"VER CRLF
+        CRLF;
+    char buff[BUFF_SIZE];
+    int len = snprintf(buff, BUFF_SIZE, header, c->http->filesize);
+    /* TODO complete respond_header() */
+    ringbuffer_pad(c->wrbuff, (uint8_t*)buff, len);
+
+    c->socket.wreof = 0;
+    c->socket.wrn = 0;
+    c->socket.wrmax = len+c->http->filesize;
+    _M(LOG_DEBUG2, "respond_header(): wrn:%d wrmax: %d\n", c->socket.wrn, c->socket.wrmax);
+    event_add(c->socket.fd, EVENT_WRITE, (event_fun_t*)write_to_socket, c);
+}
+
+/**
+ * parse request
+ */
+extern void parse_request(struct connection *c)
+{
+    uint8_t buff[BUFF_SIZE];
+    int rdn = read_s(c->socket.fd, buff, BUFF_SIZE);
+    _M(LOG_DEBUG2, "parse_request(): read: %.*s\n", rdn, buff);
+
+    if (rdn <= 0) {
+        _M(LOG_DEBUG2, "parse_request(): read over.\n");
+        c->socket.rdeof = 1;
+        event_del(c->socket.fd, EVENT_READ);
+        if (connection_a_tx(c)) {
+            _M(LOG_INFO, "parse_request(): Finish a transcation.\n");
+            connection_destory(&c);
+        }
+        return;
+    }
+
+    int parse_status = http_head_parse(c->http, buff, rdn);
+
+    /* http_head_parse finish */
+    if (0 == parse_status) {
+        if (c->http->method == HTTP_POST) {
+            /* change to read_request_content */
+            event_del(c->socket.fd, EVENT_READ);
+            event_add(c->socket.fd, EVENT_READ, (event_fun_t*)read_request_content, c);
+            return;
+        }
+
+        /* method is GET */
+        prepare_response(c);
+        event_del(c->socket.fd, EVENT_READ);
+        c->socket.rdeof = 1;
+
+        respond_header(c);
+
+        c->normal.rdeof = 0;
+        c->normal.rdn = 0;
+        c->normal.rdmax = c->http->filesize;
+        event_add(c->normal.fdro, EVENT_READ, (event_fun_t*)read_from_normalfd, c);
+    }
+}
+
 extern struct connection *connection_create(int sktfd)
 {
-    /* TODO 缓冲区大小也许可以通过 getsockopt 来设置 */
-    int buffsize = BUFF_SIZE;
-    struct connection *con = calloc(1, sizeof(*con)+2*buffsize);
+    struct connection *con = malloc(sizeof(*con));
     if (!con) return NULL;
-    con->_buffsize = buffsize;
-    con->_wrbuff = con->_rdbuff + con->_buffsize;
-    con->sktfd = sktfd;
-    con->fdro = con->fdwo = -1;
-    con->_req_status = HTTP_REQ_START;
-    con->_res_status = HTTP_RES_NOP;
-    con->_con_status = CON_INIT;
-    con->_last_req = time(NULL);
-    //con->timeout = TIMEOUT;
-    con->timeout = -1;
+    con->socket.fd = sktfd;
+    con->socket.rdeof = con->socket.wreof = 1;
+    con->normal.rdeof = con->normal.wreof = 1;
+
+    con->socket.rdn = con->socket.rdmax = 0;
+    con->socket.wrn = con->socket.wrmax = 0;
+    con->normal.rdn = con->normal.rdmax = 0;
+    con->normal.wrn = con->normal.wrmax = 0;
+
+    con->normal.fdro = con->normal.fdwo = -1;
+    con->wrbuff = ringbuffer_create(BUFF_SIZE);
+    con->rdbuff = ringbuffer_create(BUFF_SIZE);
+    con->http = http_head_malloc(HTTP_METADATA_LEN);
 
     return con;
 }
 
-static void response_prepare(struct connection *c)
+extern void connection_destory(struct connection **c)
 {
-    if (HTTP_200 != c->_http->status_code) {
-        c->_res_status = HTTP_RES_TRANSFER;
-        return;
-    }
+    if (!c || !*c) return;
+    if ((*c)->http) http_head_free(&(*c)->http);
+    if (-1 != (*c)->socket.fd)   close((*c)->socket.fd);
+    if (-1 != (*c)->normal.fdro) close((*c)->normal.fdro);
+    if (-1 != (*c)->normal.fdwo) close((*c)->normal.fdwo);
+    if ((*c)->wrbuff) ringbuffer_destory(&(*c)->wrbuff);
+    if ((*c)->rdbuff) ringbuffer_destory(&(*c)->rdbuff);
+    free(*c);
 
+    *c = NULL;
+}
+
+extern int connection_a_tx(struct connection *c)
+{
+    return (c->socket.rdeof && c->socket.wreof)
+        && (c->normal.rdeof && c->normal.wreof);
+}
+
+static void prepare_response(struct connection *c)
+{
     /* TODO Check file or execute cgi */
     char uri[PATH_MAX];
-    string_t uriline = c->_http->lines[HTTP_URI];
+    string_t uriline = c->http->lines[HTTP_URI];
     if (1 == uriline.len && '/' == uriline.str[0])
         snprintf(uri, PATH_MAX, "%s/index.html", root_path);
     else
@@ -65,8 +283,7 @@ static void response_prepare(struct connection *c)
     struct stat st;
     if (-1 == stat(uri, &st)) {
         _M(LOG_DEBUG2, "stat %s: %s\n", uri, strerror(errno));
-        c->_res_status = HTTP_RES_TRANSFER;
-        c->_http->status_code = HTTP_404;
+        c->http->status_code = HTTP_404;
         return;
     }
 
@@ -77,188 +294,16 @@ static void response_prepare(struct connection *c)
         int fd = open(uri, O_RDONLY);
         if (-1 == fd) {
             _M(LOG_DEBUG2, "open %s: %s\n", uri, strerror(errno));
-            /* server: I don't kown what happen. */
-            c->_res_status = HTTP_RES_TRANSFER;
-            c->_http->status_code = HTTP_404;
+            /* TODO server: inner error 5xx */
             return;
         }
-        c->fdro = fd;
-        c->_res_status = HTTP_RES_HEAD;
+        c->normal.fdro = fd;
+        c->http->filesize = st.st_size;
         _M(LOG_DEBUG2, "open %s: success %d\n", uri, fd);
     } else {
         /* no permission to open file */
         _M(LOG_DEBUG2, "response_transfer no permission open file.\n");
-        c->_res_status = HTTP_RES_HEAD;
-        c->_http->status_code = HTTP_404;
-    }
-}
-static void response_head(struct connection *c)
-{
-    char header[] = "HTTP/1.1 200 OK"CRLF
-                    "Connection: close"CRLF
-                    "Content-Type: text/html"CRLF
-                    "Server: yhttpd/"VER CRLF
-                    CRLF;
-    int rdn = write_s(c->sktfd, (uint8_t*)header, sizeof(header)-1);
-    printf("response_head: rdn: %d\n", rdn);
-
-    c->_res_status = HTTP_RES_TRANSFER;
-}
-static void response_transfer(struct connection *c)
-{
-    int w = ringbuffer_write(c->sktfd, c->_wrbuff, c->_buffsize, &c->_wri, &c->_wrn);
-    _M(LOG_DEBUG2, "response_transfer write: %d\n", w);
-    if (w <= 0 && (c->_res_status == HTTP_RES_READ_FIN1)) {
-        /* finish */
-        c->_con_status = CON_CLOSE;
-        c->_req_status = HTTP_REQ_FINISH;
+        c->http->status_code = HTTP_403;
     }
 }
 
-extern int connection_write_skt(struct connection *c)
-{
-    if (!c) return -1;
-    switch (c->_res_status) {
-    case HTTP_RES_START:
-        response_prepare(c);
-        break;
-
-    case HTTP_RES_HEAD:
-        response_head(c);
-        break;
-
-    case HTTP_RES_READ_FIN1:
-    case HTTP_RES_TRANSFER:
-        response_transfer(c);
-        break;
-
-    case HTTP_RES_FINISH:
-        c->_res_status = HTTP_RES_NOP;
-        break;
-
-    case HTTP_RES_NOP:
-    default: /* do nothing */
-        break;
-    }
-
-    /* write */
-    return 0;
-}
-
-static void request_transfer(struct connection *c)
-{
-}
-
-extern int connection_read_skt(struct connection *c)
-{
-    if (!c) return -1;
-    if (!c->_http) {
-        c->_http = http_head_malloc(HTTP_METADATA_LEN);
-        if (!c->_http)
-            return 1;
-    }
-    _M(LOG_DEBUG2, "connection_read_skt req_status: %d\n", c->_req_status);
-
-    int rdn;
-    switch (c->_req_status) {
-    case HTTP_REQ_START:
-        rdn = read_s(c->sktfd, c->_rdbuff, c->_buffsize);
-        _M(LOG_DEBUG2, "read skt: %.*s\n", rdn, c->_rdbuff);
-        if (rdn <= 0) {
-            c->_req_status = CON_CLOSE;
-            return 0;
-        }
-        if (0 == http_head_parse(c->_http, c->_rdbuff, rdn)) {
-            if (c->_http->method == HTTP_POST)
-                c->_req_status = HTTP_REQ_TRANSFER;
-            else {
-                c->_req_status = HTTP_REQ_NOP;
-            }
-            c->_res_status = HTTP_RES_START;
-        }
-
-        break;
-
-    case HTTP_REQ_TRANSFER:
-        request_transfer(c);
-        break;
-
-    case HTTP_REQ_NOP:
-    default:
-        break;
-    }
-
-    return 0;
-}
-
-/**
- * read from nrmfd, wirte to wrbuff
- */
-extern int connection_read_file(struct connection *c)
-{
-    if (!c || -1 == c->fdro) return -1;
-    int rdn = ringbuffer_read(c->fdro, c->_wrbuff, c->_buffsize, &c->_wri, &c->_wrn);
-    _M(LOG_DEBUG2, "connection_read_file read: %d\n", rdn);
-
-    if (rdn == 0) {
-        _M(LOG_DEBUG2, "connection_read_file read: finish.\n");
-        c->_res_status = HTTP_RES_READ_FIN1;
-    }
-    return 0;
-}
-
-/**
- * read from rdbuff, write to nrmfd
- */
-extern int connection_write_file(struct connection *c)
-{
-    /* TODO POST can use chunk encoding? */
-    if (!c || -1 == c->fdwo) return -1;
-
-    int wrn = ringbuffer_write(c->fdwo, c->_rdbuff, c->_buffsize, &c->_rdi, &c->_rdn);
-
-    if (wrn > 0)
-        return 0;
-    return 1;
-}
-
-extern int connection_isvalid(struct connection const *c)
-{
-    time_t now = time(NULL);
-    return !(!c || c->_con_status == CON_CLOSE ||
-            ((c->timeout != -1) && c->timeout < difftime(now, c->_last_req)));
-}
-
-extern void connection_destory(struct connection **c)
-{
-    if (!c || !*c) return;
-    http_head_free(&(*c)->_http);
-    close((*c)->sktfd);
-    if (-1 != (*c)->fdro) close((*c)->fdro);
-    if (-1 != (*c)->fdwo) close((*c)->fdwo);
-    free(*c);
-
-    *c = NULL;
-}
-
-extern int connection_settimeout(struct connection *c, int timeout)
-{
-    if (!c) return -1;
-    int ret = c->timeout;
-    c->timeout = timeout;
-
-    return ret;
-}
-
-extern int connection_need_write_skt(struct connection *c)
-{
-    if (c->_res_status == HTTP_RES_TRANSFER && c->_wri == c->_wrn)
-        return 0;
-    if (c->_con_status == CON_CLOSE)
-        return 0;
-    return 1;
-}
-extern int connection_need_write_file(struct connection *c)
-{
-    return (c->_rdi != c->_rdn);
-}

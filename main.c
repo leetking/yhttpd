@@ -49,7 +49,7 @@ static void help(int argc, char **argv)
 }
 static int parse_opt(int argc, char **argv)
 {
-    for (int i = 0; i < argc; i++) {
+    for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-r")) {
         } else if (!strcmp(argv[i], "-p")) {
         } else if (!strcmp(argv[i], "-d")) {
@@ -94,6 +94,7 @@ int main(int argc, char **argv)
         ret = 1;
         goto sfd_err;
     }
+    _M(LOG_DEBUG2, "Listen at 0.0.0.0:%d\n", port);
     if (-1 == listen(sfd, BACKLOG)) {
         _M(LOG_ERROR, "listen(%d): %s\n", BACKLOG, strerror(errno));
         ret = 1;
@@ -102,6 +103,7 @@ int main(int argc, char **argv)
 
     /* TODO add singal to control childs. */
 
+    /* TODO comsider change to pthread_mutex_t and mmap */
     sem_t *sem = sem_open(ACCEPT_LOCK, O_CREAT, 0644, 1);
     if (SEM_FAILED == sem) {
         _M(LOG_ERROR, "init lock %s: %s\n", ACCEPT_LOCK, strerror(errno));
@@ -110,14 +112,13 @@ int main(int argc, char **argv)
     }
 
     for (int i = 0; i < works; i++) {
-        int r;
         pid_t pid = fork();
         switch (pid) {
         case 0: /* child */
             exit(run_worker(sfd));
             break;
         case -1:
-            _M(LOG_DEBUG2, "fork: %s\n", strerror(errno));
+            _M(LOG_WARN, "fork: %s\n", strerror(errno));
             break;
         default:
             _M(LOG_DEBUG2, "start child %d# %d\n", i+1, pid);
@@ -135,7 +136,7 @@ int main(int argc, char **argv)
             exit(run_worker(sfd));
 
         } else if (-1 == pid) {
-            _M(LOG_DEBUG2, "restart child %d error.\n", neopid);
+            _M(LOG_WARN, "restart child %d error.\n", neopid);
         } else
             _M(LOG_DEBUG2, "restart child %d -> %d.\n", pid, neopid);
     }

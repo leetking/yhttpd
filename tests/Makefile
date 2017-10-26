@@ -1,8 +1,8 @@
 CC := gcc
 VER := test
 
-CFLAGS  := -g3 -Wall -O0 -MMD -MP -I../ -DVER=\"$(VER)\"
-LDFLAGS := -lpthread
+CFLAGS  := -g3 -Wall -O0 -MMD -MP -I../ -DVER=\"$(VER)\" -fsanitize=address
+LDFLAGS := -lpthread -fsanitize=address
 
 SRCS := $(filter-out ../main.c, $(wildcard ../*.c))
 OBJS := $(SRCS:.c=.c.o)
@@ -36,7 +36,8 @@ clean:
 	@echo "RM  test-worker"
 	@echo "RM  test-http"
 distclean: clean
-	@$(RM) $(DEPS)
+	@$(RM) $(DEPS) *.c.d core
 	@echo "RM  $(DEPS)"
+	@echo "RM  *.c.d"
 
 .PHONY: clean all

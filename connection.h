@@ -3,44 +3,49 @@
 
 #include <stdint.h>
 #include <time.h>
+#include <semaphore.h>
 #include "http.h"
+#include "ring-buffer.h"
 
 /* 内部维护一个状态机 */
 
 struct connection {
-    /* public */
-    int sktfd;  /* socket file description */
-    int fdro;   /* local file description, read only, init with -1 */
-    int fdwo;   /* local file description, write only, init with -1 */
-    int timeout; /* s, -1 never, default TIMEOUT */
+    struct {
+        int fd;
+        int rdn, rdmax;
+        int wrn, wrmax;
+        uint8_t rdeof:1;
+        uint8_t wreof:1;
+        uint8_t rdreg:1;
+        uint8_t wrreg:1;
+    } socket;
 
-    /* private */
-    time_t _last_req;
-    struct http_head *_http;
-    int _con_status;
-    int _req_status;
-    int _res_status;
-    int _buffsize;          /* only use _buffsize-1 */
-    int _rdi, _rdn;
-    int _wri, _wrn;
-    uint8_t *_wrbuff;
-    uint8_t _rdbuff[1];     /* a trick */
+    struct {
+        int fdro, fdwo;
+        int rdn, rdmax;
+        int wrn, wrmax;
+        uint8_t rdeof:1;
+        uint8_t wreof:1;
+        uint8_t rdreg:1;
+        uint8_t wrreg:1;
+    } normal;
+
     /*
-     * sktfd --read--> [ rdi | rdbuff | rdn ] --write-> nrmfd
-     * sktfd <-write-- [ wri | wrbuff | wrn ] <--read-- nrmfd
+     * sktfd --read--> [ rdbuff ] --write-> fdwo
+     * sktfd <-write-- [ wrbuff ] <--read-- fdro
      */
+    ringbuffer_t rdbuff;
+    ringbuffer_t wrbuff;
+
+    struct http_head *http;
 };
 
-extern struct connection *connection_create(int sfd);
-extern int connection_write_skt(struct connection *c);
-extern int connection_read_skt(struct connection *c);
-extern int connection_read_file(struct connection *c);
-extern int connection_write_file(struct connection *c);
-extern int connection_isvalid(struct connection const *c);
 extern void connection_destory(struct connection **c);
-extern int connection_settimeout(struct connection *c, int timeout);
-
-extern int connection_need_write_skt(struct connection *c);
-extern int connection_need_write_file(struct connection *c);
+extern struct connection *connection_create(int sktfd);
+/**
+ * Finish a reqeust and response
+ */
+extern int connection_a_tx(struct connection *c);
+extern void parse_request(struct connection *con);
 
 #endif /* CONNECTION_H__ */

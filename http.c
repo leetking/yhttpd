@@ -46,10 +46,6 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
         PS_URI_IN,
         PS_VERSION_BF,
         PS_VERSION_IN,
-        PS_Host_BF,
-        PS_Host_IN,
-        PS_host_bf,
-        PS_host_in,
 
         PS_LINE_BF,
         PS_KEY_IN,
@@ -177,51 +173,7 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
                 }
             }
             if (LF == *p)
-                req->_ps_status = PS_Host_BF;
-            break;
-
-        case PS_Host_BF:    /* keyword "Host" */
-            if ('h' != tolower(*p)) {
-                req->status_code = HTTP_404;
-                return 0;
-            }
-            req_start = p;
-            req->_ps_status = PS_Host_IN;
-            break;
-
-        case PS_Host_IN:
-            if (':' == *p) {
-                if ((4 == p - req_start) && (!strncasecmp("Host", (char*)req_start, 4)))
-                    req->_ps_status = PS_host_bf;
-                else {
-                    req->status_code = HTTP_404;
-                }
-            }
-            break;
-
-        case PS_host_bf:    /* The real host */
-            if (' ' == *p)
-                break;
-            req->_ps_status = PS_host_in;
-            req_start = p;
-            break;
-
-        case PS_host_in:
-            if (CR == *p) {
-                int rest = req->_metadatalen - req->_metadataidx;
-                int len = MIN(p - req_start, rest);
-                if (len <= 0) {
-                    req->status_code = HTTP_404;
-                    return 0;    /* to long! */
-                }
-                req->lines[HTTP_HOST].str = (char*)req->_metadata + req->_metadataidx;
-                req->lines[HTTP_HOST].len = len;
-                memcpy(req->_metadata + req->_metadataidx, req_start, len);
-                req->_metadataidx += len;
-            }
-            if (LF == *p)
-                req->_ps_status = PS_LINE_BF;  /* parse normal line */
-
+                req->_ps_status = PS_LINE_BF;
             break;
 
         case PS_LINE_BF:
@@ -247,6 +199,7 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
                     string_t key;
                     int type;
                 } keys[] = {
+                    { { "Host",             4,  }, HTTP_HOST },
                     { { "Connection",       10, }, HTTP_LINE_EXT_CON, },
                     { { "Referer",          7,  }, HTTP_REFERER, },
                     { { "User-Agent",       10, }, HTTP_UA,  },
