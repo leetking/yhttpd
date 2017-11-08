@@ -2,7 +2,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include "../set.h"
+#include "../src/set.h"
 
 struct stu {
     char *name;

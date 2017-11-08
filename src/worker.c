@@ -44,6 +44,7 @@ static void accept_request(void *_data)
 
 extern int run_worker(int const sfd)
 {
+    int ret;
     event_init();
     sem_t *lock = sem_open(ACCEPT_LOCK, O_EXCL);
     if (lock == SEM_FAILED) {
@@ -55,7 +56,8 @@ extern int run_worker(int const sfd)
     data.lock = lock;
     event_add(sfd, EVENT_READ, accept_request, &data);
 
-    event_loop();
+    ret = event_loop();
+    _M(LOG_DEBUG, "event_loop() quit: %d\n", ret);
 
     event_del(sfd, EVENT_READ);
     sem_close(lock);

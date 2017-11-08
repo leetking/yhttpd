@@ -17,7 +17,7 @@ LDFLAGS_RELEASE :=
 CFLAGS  += $(CFLAGS_DEBUG)
 LDFLAGS += $(LDFLAGS_DEBUG)
 
-SRCS := $(wildcard *.c)
+SRCS := $(wildcard src/*.c)
 DEPS := $(SRCS:.c=.c.d)
 OBJS := $(SRCS:.c=.c.o)
 

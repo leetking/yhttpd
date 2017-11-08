@@ -4,7 +4,7 @@ VER := test
 CFLAGS  := -g3 -Wall -O0 -MMD -MP -I../ -DVER=\"$(VER)\" -fsanitize=address
 LDFLAGS := -lpthread -fsanitize=address
 
-SRCS := $(filter-out ../main.c, $(wildcard ../*.c))
+SRCS := $(filter-out ../src/main.c, $(wildcard ../src/*.c))
 OBJS := $(SRCS:.c=.c.o)
 DEPS := $(SRCS:.c=.c.d)
 

@@ -7,9 +7,9 @@
 #include <fcntl.h>
 #include <semaphore.h>
 
-#include "../worker.h"
-#include "../common.h"
-#include "../log.h"
+#include "../src/worker.h"
+#include "../src/common.h"
+#include "../src/log.h"
 
 int main()
 {

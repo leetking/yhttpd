@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "../http.h"
+#include "../src/http.h"
 
 static void test_http_head(char const *reqstr, int len)
 {
