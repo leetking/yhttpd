@@ -22,6 +22,9 @@ test-worker: test-worker.c.o $(OBJS)
 test-http: test-http.c.o $(OBJS)
 	@$(CC) -o $@ $^ $(LDFLAGS)
 	@echo "GEN $@"
+test-ringbuffer: test-ringbuffer.c.o $(OBJS)
+	@$(CC) -o $@ $^ $(LDFLAGS)
+	@echo "GEN $@"
 
 %.c.o: %.c
 	@$(CC) -o $@ -c $^ $(CFLAGS)
@@ -29,12 +32,14 @@ test-http: test-http.c.o $(OBJS)
 -include $(DEPS)
 
 clean:
-	@$(RM) $(OBJS) *.o test-log test-set test-worker test-http
+	@$(RM) $(OBJS) *.o test-log test-set test-worker test-http \
+		test-ringbuffer
 	@echo "RM  $(OBJS)"
 	@echo "RM  test-log"
 	@echo "RM  test-set"
 	@echo "RM  test-worker"
 	@echo "RM  test-http"
+	@echo "RM  test-ringbuffer"
 distclean: clean
 	@$(RM) $(DEPS) *.c.d core
 	@echo "RM  $(DEPS)"

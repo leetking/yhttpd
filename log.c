@@ -15,19 +15,20 @@ extern void yhttp_log_set(int l)
 extern void yhttp_log(int l, char const *str, ...)
 {
     if (l > level || l < LOG_ERROR) return;
-    char buff[] = "1970-01-01 00:00:00";
-    time_t rawtime;
+    char buff[] = "1970-01-01 00:00:00.0000";
+    struct timespec rawtime = {0, 0};
     struct tm *timeinfo;
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-    if (timeinfo)
+    int ret;
+    ret = clock_gettime(CLOCK_REALTIME, &rawtime);
+    timeinfo = localtime(&rawtime.tv_sec);
+    if (0 == ret)
         strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M:%S", timeinfo);
     static char const *strlevel[] = {
         "[ERROR] ", "[WARN]  ",
         "[INFO]  ", "[DEBUG1]",
         "[DEBUG2]",
     };
-    printf("%s ", buff);
+    printf("%s.%02d ", buff, (int)(rawtime.tv_nsec/1e9 * 1e4));
     printf("%s ", strlevel[l]);
     va_list ap;
     va_start(ap, str);

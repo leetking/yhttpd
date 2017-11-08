@@ -106,7 +106,6 @@ extern int event_loop()
             if (fun->fd > maxfd)
                 maxfd = fun->fd;
         }
-        _M(LOG_DEBUG2, "\n");
         int ret = select(maxfd+1, &EVENT.rdset2, &EVENT.wrset2, NULL, NULL);
         if (-1 == ret) {
             _M(LOG_DEBUG2, "select: %s\n", strerror(errno));

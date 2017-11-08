@@ -45,7 +45,7 @@ int main()
         return 1;
     }
 
-    sem_t *sem = sem_open(ACCEPT_LOCK, O_CREAT, 0644, 1);
+    sem_t *sem = sem_open(ACCEPT_LOCK, O_CREAT, 0600, 1);
     if (SEM_FAILED == sem) {
         perror("init lock");
         goto err;
