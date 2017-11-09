@@ -38,10 +38,14 @@ struct connection {
     ringbuffer_t wrbuff;
 
     struct http_head *http;
+
+    struct http_req req;
+    struct http_res res;
+    uint8_t stuff[1];
 };
 
-extern void connection_destory(struct connection **c);
 extern struct connection *connection_create(int sktfd);
+extern void connection_destory(struct connection **c);
 /**
  * Finish a reqeust and response
  */

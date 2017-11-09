@@ -19,21 +19,6 @@ typedef struct string_st {
 typedef struct cookie_st {
 } cookie_t;
 
-/* parse status */
-enum {
-    HTTP_REQ_START,
-    HTTP_REQ_HEAD_FINISH,
-    HTTP_REQ_TRANSFER,
-    HTTP_REQ_FINISH,
-    HTTP_REQ_NOP,
-
-    HTTP_RES_START,
-    HTTP_RES_HEAD,
-    HTTP_RES_TRANSFER,
-    HTTP_RES_NOP,
-    HTTP_RES_READ_FIN1,
-    HTTP_RES_FINISH,
-};
 #define HTTP_GET     0
 #define HTTP_POST    1
 #define HTTP_HEAD    2
@@ -67,8 +52,8 @@ enum {
 /* status code */
 enum {
     HTTP_200 = 0, /* OK */
-
     HTTP_202,     /* Accept */
+
     HTTP_301,     /* Moved Permanently */
 
     HTTP_400,     /* Bad Request */
@@ -88,16 +73,33 @@ enum {
 };
 
 static char const * http_code_str[] = {
-    "OK",
-    "Accept",
+    "200 OK",
+    "202 Accept",
+
+    "301 Moved Permanently",
+
+    "400 Bad Request",
+    "403 Forbidden",
+    "404 Not Found",
+    "405 Method Not Allowed",
+    "413 Request Entity Too Large",
+    "414 Request-URI TOo Large",
+    "415 Unsupported Media Type",
+    "416 Requested range not statisfiable",
+
+    "500 Internal Server Error",
+    "501 Not Implemented",
+    "505 HTTP Version not supported",
+
+    NULL,
 };
 
 struct http_req {
     int8_t method;
     int8_t version;
     string_t lines[HTTP_LINE_MAX];
-    int content_length;
     int range1, range2;
+    cookie_t cookies;
 
     uint8_t iscon:1;
     uint8_t ischunk:1;
@@ -106,6 +108,11 @@ struct http_req {
 struct http_res {
     int8_t code;
     int8_t version;
+    int content_length;
+    cookie_t cookies;
+
+    uint8_t iscon:1;
+    uint8_t ischunk:1;
 };
 
 struct http_head {

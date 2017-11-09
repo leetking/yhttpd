@@ -10,3 +10,4 @@ echo "test"
 
 ./test-log
 
+# valgrind --leak-check=yes

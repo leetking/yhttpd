@@ -28,7 +28,7 @@ extern void yhttp_log(int l, char const *str, ...)
         "[INFO]  ", "[DEBUG1]",
         "[DEBUG2]",
     };
-    printf("%s.%02d ", buff, (int)(rawtime.tv_nsec/1e9 * 1e4));
+    printf("%s.%04d ", buff, (int)(rawtime.tv_nsec/1e9 * 1e4));
     printf("%s ", strlevel[l]);
     va_list ap;
     va_start(ap, str);

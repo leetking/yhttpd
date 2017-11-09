@@ -6,6 +6,13 @@
 #include "set.h"
 #include "log.h"
 
+static struct event_t {
+    set_t funs;
+    fd_set rdset,  wrset;
+    fd_set rdset2, wrset2;
+    uint8_t quit:1;
+} EVENT;
+
 struct callback_fun {
     int fd;
     int event;
@@ -24,17 +31,12 @@ static uint32_t callfun_hash(struct callback_fun *obj)
     hash ^= obj->event;
     return hash;
 }
-static struct {
-    set_t funs;
-    fd_set rdset,  wrset;
-    fd_set rdset2, wrset2;
-} EVENT;
-
 extern int event_init()
 {
     FD_ZERO(&EVENT.rdset);
     FD_ZERO(&EVENT.wrset);
     EVENT.funs = set_create((cmp_t*)callfun_cmp, NULL, (hashfn_t*)callfun_hash);
+    EVENT.quit = 0;
     if (!EVENT.funs) {
         _M(LOG_ERROR, "Init EVENT.funs error!\n");
         return 1;
@@ -95,8 +97,7 @@ extern int event_del(int fd, int event)
 }
 extern int event_loop()
 {
-    int quit = 0;
-    while (!quit) {
+    while (!EVENT.quit) {
         memcpy(&EVENT.rdset2, &EVENT.rdset, sizeof(fd_set));
         memcpy(&EVENT.wrset2, &EVENT.wrset, sizeof(fd_set));
         int maxfd = -1;
@@ -109,7 +110,7 @@ extern int event_loop()
         int ret = select(maxfd+1, &EVENT.rdset2, &EVENT.wrset2, NULL, NULL);
         if (-1 == ret) {
             _M(LOG_DEBUG2, "select: %s\n", strerror(errno));
-            quit = 1;
+            event_break();
             return -1;
         }
 
@@ -127,4 +128,8 @@ extern int event_loop()
 extern void event_quit()
 {
     set_destory(&EVENT.funs);
+}
+extern void event_break()
+{
+    EVENT.quit = 1;
 }

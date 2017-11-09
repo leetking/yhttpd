@@ -26,20 +26,24 @@ extern void event_quit();
  *         1: fd-event has been registered, there is no thing to do
  *        -1: error
  */
-extern int  event_add(int fd, int event, event_fun_t *fun, void *data);
+extern int event_add(int fd, int event, event_fun_t *fun, void *data);
 /**
  * @return 0: success
  *         1: fd-event is not found
  *        -1: error
  */
-extern int  event_del(int fd, int event);
+extern int event_del(int fd, int event);
 
 /**
  * start event loop
  * @return 0: finish loop normally
  *        -1: finish loop unnormally
  */
-extern int  event_loop();
+extern int event_loop();
+/**
+ * break the loop and jump it over
+ */
+extern void event_break();
 
 #endif
 

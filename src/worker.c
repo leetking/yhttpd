@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <signal.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -18,6 +19,16 @@ struct accept_data {
     sem_t *lock;
     int sfd;
 };
+
+static void deal_sigpipe(int x)
+{
+    _M(LOG_WARN, "catch SIGPIPE, ignore\n");
+}
+static void deal_sigint(int x)
+{
+    _M(LOG_WARN, "catch SIGINT, event_break()\n");
+    event_break();
+}
 
 static void accept_request(void *_data)
 {
@@ -45,6 +56,8 @@ static void accept_request(void *_data)
 extern int run_worker(int const sfd)
 {
     int ret;
+    signal(SIGPIPE, deal_sigpipe);
+    signal(SIGINT,  deal_sigint);
     event_init();
     sem_t *lock = sem_open(ACCEPT_LOCK, O_EXCL);
     if (lock == SEM_FAILED) {

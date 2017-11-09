@@ -4,7 +4,9 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
+#include <signal.h>
 
+#include <getopt.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -26,13 +28,14 @@ static int as_deamon = 0;
 static int log = 0;
 static uint16_t port = 80;
 
-static int works = WORKS;
+static pid_t works[WORKS];
+static int8_t quit = 0;
 
 static void help(int argc, char **argv)
 {
     printf("usage: %s [OPTION]\n"
            "a sample http server, for studing.\n"
-           "OPTIONS:"
+           "OPTIONS:\n"
            "      -r path    set `www` directory, default current directory(.)\n"
            "      -p port    specify a port, default 80\n"
            "      -d         run as daemon\n"
@@ -41,6 +44,7 @@ static void help(int argc, char **argv)
            "      -e path    specify `status-codes` file directory, default `$www/err-codes`\n"
            "      -l path    specify the log file.\n"
            "      -v <1,2,3> verbose.\n"
+           "      -h         show this page.\n"
            "\n"
            "%s %s\n"
            "(c) GPL v3\n"
@@ -49,21 +53,48 @@ static void help(int argc, char **argv)
 }
 static int parse_opt(int argc, char **argv)
 {
-    for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-r")) {
-        } else if (!strcmp(argv[i], "-p")) {
-        } else if (!strcmp(argv[i], "-d")) {
-        } else if (!strcmp(argv[i], "-c")) {
-        } else if (!strcmp(argv[i], "-w")) {
-        } else if (!strcmp(argv[i], "-e")) {
-        } else if (!strcmp(argv[i], "-l")) {
-        } else if (!strcmp(argv[i], "-v")) {
-        } else {
-            printf("");
-            return 1;
+    int ret = 0;
+    int c;
+    while ((c = getopt(argc, argv, "r:p:dc:w:e:l:v:h")) != -1) {
+        switch (c) {
+        case 'r':
+            strncpy(root_path, optarg, strlen(optarg));
+            _M(LOG_DEBUG2, "root_path: %s\n", root_path);
+            break;
+        case 'p':
+            port = atoi(optarg);
+            _M(LOG_DEBUG2, "port: %d\n", port);
+            break;
+        case 'd':
+            break;
+        case 'c':
+            break;
+        case 'w':
+            break;
+        case 'e':
+            break;
+        case 'l':
+            break;
+        case 'v':
+            break;
+        case '?':   /* error */
+            ret = -1;
+            break;
+        case 'h':
+        default:
+            help(argc, argv);
+            ret = -1;
+            break;
         }
     }
-    return 0;
+    return ret;
+}
+static void deal_sigint(int x)
+{
+    _M(LOG_DEBUG2, "catch SIGINT, quit.\n");
+    quit = 1;
+    for (int i = 0; i < WORKS; i++)
+        kill(works[i], SIGINT);
 }
 
 int main(int argc, char **argv)
@@ -101,8 +132,6 @@ int main(int argc, char **argv)
         goto sfd_err;
     }
 
-    /* TODO add singal to control childs. */
-
     /* TODO comsider change to pthread_mutex_t and mmap */
     sem_t *sem = sem_open(ACCEPT_LOCK, O_CREAT, 0644, 1);
     if (SEM_FAILED == sem) {
@@ -111,7 +140,7 @@ int main(int argc, char **argv)
         goto sfd_err;
     }
 
-    for (int i = 0; i < works; i++) {
+    for (int i = 0; i < WORKS; i++) {
         pid_t pid = fork();
         switch (pid) {
         case 0: /* child */
@@ -121,24 +150,36 @@ int main(int argc, char **argv)
             _M(LOG_WARN, "fork: %s\n", strerror(errno));
             break;
         default:
+            works[i] = pid;
             _M(LOG_DEBUG2, "start child %d# %d\n", i+1, pid);
             break;
         }
     }
 
+    /* TODO add singal to control childs. */
+    signal(SIGINT, deal_sigint);
+    signal(SIGCHLD, SIG_IGN);
+
     /* main loop */
     for (;;) {
         pid_t pid, neopid;
         pid = wait(NULL);
+        if (quit) break;
         _M(LOG_DEBUG2, "child %d quit.\n", pid);
+
         neopid = fork();
         if (0 == neopid) {
             exit(run_worker(sfd));
 
         } else if (-1 == pid) {
             _M(LOG_WARN, "restart child %d error.\n", neopid);
-        } else
+        } else {
+            for (int i = 0; i < WORKS; i++) {
+                if (pid == works[i])
+                    works[i] = neopid;
+            }
             _M(LOG_DEBUG2, "restart child %d -> %d.\n", pid, neopid);
+        }
     }
 
     sem_unlink(ACCEPT_LOCK);

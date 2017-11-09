@@ -69,7 +69,8 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
             if (CR == *p || LF == *p)
                 break;
             if (!isupper(*p)) {
-                req->status_code = HTTP_404;
+                req->status_code = HTTP_400;
+                req->_ps_status = HTTP_PARSE_INIT;
                 return 0;
             }
             req->_ps_status = PS_METHOD;
@@ -85,8 +86,8 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
                     else if (!strncmp("PUT", (char*)req_start, 3))
                         req->method = HTTP_PUT;
                     else {
-                        /* TODO add status code */
-                        req->status_code = HTTP_404;
+                        req->status_code = HTTP_501;
+                        req->_ps_status = HTTP_PARSE_INIT;
                         return 0;
                     }
                     break;
@@ -96,18 +97,21 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
                     else if (!strncmp("HEAD", (char*)req_start, 4))
                         req->method = HTTP_HEAD;
                     else {
-                        req->status_code = HTTP_404;
+                        req->status_code = HTTP_501;
+                        req->_ps_status = HTTP_PARSE_INIT;
                         return 0;
                     }
                     break;
 
                 default:
-                    req->status_code = HTTP_404;
+                    req->status_code = HTTP_501;
+                    req->_ps_status = HTTP_PARSE_INIT;
                     return 0;
                 }
                 req->_ps_status = PS_URI_BF;
             } else if (!isupper(*p)) {
-                req->status_code = HTTP_404;
+                req->status_code = HTTP_400;
+                req->_ps_status = HTTP_PARSE_INIT;
                 return 0;
             }
             break;
@@ -116,7 +120,8 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
             if (' ' == *p)
                 break;
             if ('/' != *p) {
-                req->status_code = HTTP_404;
+                req->status_code = HTTP_400;
+                req->_ps_status = HTTP_PARSE_INIT;
                 return 0;
             }
             req_start = p;
@@ -129,7 +134,8 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
                 int len = MIN(p - req_start, rest);
                 if (len <= 0) {
                     /* to long! */
-                    req->status_code = HTTP_404;
+                    req->status_code = HTTP_413;
+                    req->_ps_status = HTTP_PARSE_INIT;
                     return 0;
                 }
                 req->lines[HTTP_URI].str = (char*)req->_metadata + req->_metadataidx;
@@ -146,7 +152,8 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
             if (' ' == *p)
                 break;
             if ('H' != *p) {
-                req->status_code = HTTP_404;
+                req->status_code = HTTP_400;
+                req->_ps_status = HTTP_PARSE_INIT;
                 return 0;
             }
             req_start = p;
@@ -156,7 +163,8 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
         case PS_VERSION_IN:
             if (CR == *p) {
                 if ((8 != (p-req_start)) || (0 != strncmp("HTTP/", (char*)req_start, 5))) {
-                    req->status_code = HTTP_404;
+                    req->status_code = HTTP_400;
+                    req->_ps_status = HTTP_PARSE_INIT;
                     return 0;
                 }
                 req_start = req_start+5;
@@ -168,7 +176,8 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
                     req->ver = HTTP11;
                     req->iscon = 1;     /* default is keep-alive */
                 } else {
-                    req->status_code = HTTP_404;
+                    req->status_code = HTTP_400;
+                    req->_ps_status = HTTP_PARSE_INIT;
                     return 0;
                 }
             }
@@ -184,6 +193,7 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
             }
             if (req->_fin_lf && LF == *p) {
                 req->status_code = HTTP_200;
+                req->_ps_status = HTTP_PARSE_INIT;
                 return 0;
             }
 
@@ -230,7 +240,8 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
                 }
 
             } else if (!(isalpha(*p) || '-' == *p || '_' == *p)) {
-                req->status_code = HTTP_404;
+                req->status_code = HTTP_400;
+                req->_ps_status = HTTP_PARSE_INIT;
                 return 0;
             }
             break;
@@ -271,7 +282,8 @@ extern int http_head_parse(struct http_head *req, uint8_t const *buff, ssize_t l
                     len = MIN(p - req_start, rest);
                     _D("value: %.*s\n", len, req_start);
                     if (len <= 0) {
-                        req->status_code = HTTP_404;
+                        req->status_code = HTTP_413;
+                        req->_ps_status = HTTP_PARSE_INIT;
                         return 0;    /* to long! */
                     }
                     req->lines[req->_line_type].str = (char*)req->_metadata + req->_metadataidx;

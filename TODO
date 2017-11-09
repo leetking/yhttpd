@@ -1,0 +1,7 @@
+- timeout
+- rebuild sources
+- support IPv6
+- program terminates when singal SIGPIPE happen
+- optimize performance from allocing memory by pool
+- url pattern
+

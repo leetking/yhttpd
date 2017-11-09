@@ -166,20 +166,33 @@ static void read_request_content(struct connection *c)
 static void respond_header(struct connection *c)
 {
     /* Ref: Figure 1 */
-    char header[] = "HTTP/1.1 200 OK"CRLF
+    char header[] = "HTTP/1.1 %s"CRLF
         "Connection: Keey-Alive" CRLF
         "Content-Type: text/html"CRLF
         "Content-Length: %d" CRLF
         "Server: yhttpd/"VER CRLF
         CRLF;
     char buff[BUFF_SIZE];
-    int len = snprintf(buff, BUFF_SIZE, header, c->http->filesize);
+    char const *code_str = http_code_str[c->http->status_code];
+    char const *content = "";
+    int content_len = c->http->filesize;
+    if (HTTP_200 != c->http->status_code) {
+        content_len = strlen(code_str);
+        content = code_str;
+    }
+    int len = snprintf(buff, BUFF_SIZE, header, code_str, content_len);
+    _M(LOG_DEBUG2, "respond header:\n");
+    _M(LOG_DEBUG2, "%.*s\n", len, buff);
+
     /* TODO complete respond_header() */
     ringbuffer_pad(c->wrbuff, (uint8_t*)buff, len);
+    if (HTTP_200 != c->http->status_code) {
+        ringbuffer_pad(c->wrbuff, (uint8_t*)content, content_len);
+    }
 
     c->socket.wreof = 0;
     c->socket.wrn = 0;
-    c->socket.wrmax = len+c->http->filesize;
+    c->socket.wrmax = len+content_len;
     _M(LOG_DEBUG2, "respond_header(): wrn:%d wrmax: %d\n", c->socket.wrn, c->socket.wrmax);
     event_add(c->socket.fd, EVENT_WRITE, (event_fun_t*)write_to_socket, c);
 }
@@ -222,10 +235,13 @@ extern void parse_request(struct connection *c)
 
         respond_header(c);
 
-        c->normal.rdeof = 0;
-        c->normal.rdn = 0;
-        c->normal.rdmax = c->http->filesize;
-        event_add(c->normal.fdro, EVENT_READ, (event_fun_t*)read_from_normalfd, c);
+        _M(LOG_DEBUG2, "status_code: %s\n", http_code_str[c->http->status_code]);
+        if (HTTP_200 == c->http->status_code) {
+            c->normal.rdeof = 0;
+            c->normal.rdn = 0;
+            c->normal.rdmax = c->http->filesize;
+            event_add(c->normal.fdro, EVENT_READ, (event_fun_t*)read_from_normalfd, c);
+        }
     }
 }
 
@@ -282,8 +298,11 @@ static void prepare_response(struct connection *c)
     _M(LOG_DEBUG2, "full path: %s\n", uri);
     struct stat st;
     if (-1 == stat(uri, &st)) {
-        _M(LOG_DEBUG2, "stat %s: %s\n", uri, strerror(errno));
-        c->http->status_code = HTTP_404;
+        _M(LOG_DEBUG2, "stat %s: %d %s\n", uri, errno, strerror(errno));
+        if (ENOENT == errno)
+            c->http->status_code = HTTP_404;
+        else
+            c->http->status_code = HTTP_500;
         return;
     }
 
@@ -294,7 +313,7 @@ static void prepare_response(struct connection *c)
         int fd = open(uri, O_RDONLY);
         if (-1 == fd) {
             _M(LOG_DEBUG2, "open %s: %s\n", uri, strerror(errno));
-            /* TODO server: inner error 5xx */
+            c->http->status_code = HTTP_404;
             return;
         }
         c->normal.fdro = fd;

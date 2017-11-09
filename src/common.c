@@ -7,9 +7,11 @@ char err_codes_path[PATH_MAX] = ".";
 
 ssize_t write_s(int fd, uint8_t const *buff, ssize_t n)
 {
-    return write(fd, buff, n);
+    int wrn = write(fd, buff, n);
+    return wrn;
 }
 ssize_t read_s(int fd, uint8_t *buff, ssize_t n)
 {
-    return read(fd, buff, n);
+    int rdn = read(fd, buff, n);
+    return rdn;
 }
