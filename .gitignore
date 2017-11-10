@@ -51,5 +51,10 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+# Syncthing
+.stfolder/
+.stversions/
+
 yhttpd
 todo
+study/

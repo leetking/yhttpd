@@ -1,4 +1,5 @@
 #include <string.h>
+#include <signal.h>
 #include <stdio.h>
 
 #include <unistd.h>
@@ -11,10 +12,22 @@
 #include "../src/common.h"
 #include "../src/log.h"
 
+sem_t *sem;
+int sfd;
+
+void test_quit(int _)
+{
+    sem_unlink(ACCEPT_LOCK);
+    sem_close(sem);
+    close(sfd);
+}
+
 int main()
 {
+    signal(SIGINT, test_quit);
+
     yhttp_log_set(LOG_DEBUG2);
-    int sfd = socket(AF_INET, SOCK_STREAM, 0);
+    sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (-1 == sfd) {
         perror("socket");
         return 1;
@@ -45,16 +58,18 @@ int main()
         return 1;
     }
 
-    sem_t *sem = sem_open(ACCEPT_LOCK, O_CREAT, 0600, 1);
+    sem = sem_open(ACCEPT_LOCK, O_CREAT, 0600, 1);
     if (SEM_FAILED == sem) {
         perror("init lock");
         goto err;
     }
 
-    run_worker(sfd);
+    run_worker(1, sfd);
 
 err:
+    sem_close(sem);
     sem_unlink(ACCEPT_LOCK);
+    close(sfd);
 
     return 0;
 }

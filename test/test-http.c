@@ -103,16 +103,42 @@ static void test_http_head3(void)
     printf("\n");
 }
 
-static void test_http_head4()
+static void test_http_head4(void)
 {
     printf("Test http request 4\n");
-    char reqstr[] = "GET / HTTP/1.1"CRLF
+    char reqstr[] = "GET /foo?p1=v1&p2=v2 HTTP/1.1"CRLF
                     "User-Agent: WebBench 1.5"CRLF
                     "Host: 127.0.0.1"CRLF
                     "Connection: close"CRLF
                     CRLF;
-    test_http_head(reqstr, strlen(reqstr));
+    struct http_head *req = http_head_malloc(HTTP_METADATA_LEN);
+    assert(0 == http_head_parse(req, (uint8_t*)reqstr, strlen(reqstr)));
+    assert(HTTP_200 == req->status_code);
+    printf("uri: %.*s\n", req->lines[HTTP_URI].len, req->lines[HTTP_URI].str);
+    printf("query: %.*s\n", req->lines[HTTP_QUERY].len, req->lines[HTTP_QUERY].str);
     printf("\n");
+
+    http_head_free(&req);
+}
+
+static void test_http_post1(void)
+{
+    printf("Test http request 5\n");
+    char reqstr[] = "POST / HTTP/1.1"CRLF
+                    "Host: 127.0.0.1:8080"CRLF
+                    "User-Agent: curl/7.47.0"CRLF
+                    "Accept: */*"CRLF
+                    "Content-Length: 11"CRLF
+                    "Content-Type: application/x-www-form-urlencoded"CRLF
+                    CRLF
+                    "p1=v1&p2=v2"CRLF;
+    struct http_head *req = http_head_malloc(HTTP_METADATA_LEN);
+    assert(0 == http_head_parse(req, (uint8_t*)reqstr, strlen(reqstr)));
+    assert(HTTP_200 == req->status_code);
+    printf("uri: %.*s\n", req->lines[HTTP_URI].len, req->lines[HTTP_URI].str);
+    printf("\n");
+
+    http_head_free(&req);
 }
 
 int main()
@@ -121,5 +147,7 @@ int main()
     test_http_head2();
     test_http_head3();
     test_http_head4();
+
+    test_http_post1();
     return 0;
 }

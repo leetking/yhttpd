@@ -1,49 +1,57 @@
 #ifndef EVENT_H__
 #define EVENT_H__
 
-#include "connection.h"
-#include "set.h"
+#include <stdint.h>
 
-#define CON_MAX     (1024)
+#include "common.h"
+#include "list.h"
 
-enum {
-    EVENT_READ = 0,   /* read  */
-    EVENT_WRITE,      /* write */
-    EVENT_ONCE,       /* only be invoked once */
-    EVENT_TIMEOUT,    /* timeout */
+extern list_t posted_events;
+extern list_t timeout_list;
+extern msec_t current_msec;
 
-    EVENT_ID_MAX,
+typedef struct event_t event_t;
+typedef void event_cb_t(event_t *ev);
+
+struct event_t {
+    void *data;
+    event_cb_t *handle;
+    int index;
+    list_t posted;
+    list_t timer;
+    uint8_t accept:1;
+    uint8_t read:1;
+    uint8_t write:1;
+    uint8_t timeout_set:1;
+    uint8_t timeout:1;
 };
 
-typedef void event_fun_t(void *data);
+enum {
+    EVENT_READ  = 0x01,   /* read  */
+    EVENT_WRITE = 0x10,   /* write */
+};
 
-extern int  event_init();
+extern event_t *event_malloc(void);
+extern void event_free(event_t *ev);
+
+extern int event_init();
 extern void event_quit();
-/**
- * add event, but if fd-event is registered function `fun' alreadly,
- * there is no thing to do
- * @return 0: success
- *         1: fd-event has been registered, there is no thing to do
- *        -1: error
- */
-extern int event_add(int fd, int event, event_fun_t *fun, void *data);
-/**
- * @return 0: success
- *         1: fd-event is not found
- *        -1: error
- */
-extern int event_del(int fd, int event);
+extern int event_add(event_t *ev, int event);
+extern int event_del(event_t *ev, int event);
+extern int event_process(msec_t ms);
 
-/**
- * start event loop
- * @return 0: finish loop normally
- *        -1: finish loop unnormally
- */
-extern int event_loop();
-/**
- * break the loop and jump it over
- */
-extern void event_break();
+extern int event_process_posted(list_t *queue);
+extern void process_all_events();
+extern msec_t event_min_timer();
+extern void event_add_timer(event_t *ev);
+extern void event_del_timer(event_t *ev);
+extern msec_t event_update_time();
+extern void event_process_expire();
+
+#define EVENT_TIMER_INF     ((msec_t)-1)
+
+#define event_post_event(q, ev) \
+    list_add(q, &(ev)->posted)
 
 #endif
 

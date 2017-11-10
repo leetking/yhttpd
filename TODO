@@ -1,7 +1,46 @@
-- timeout
-- rebuild sources
-- support IPv6
-- program terminates when singal SIGPIPE happen
-- optimize performance from allocing memory by pool
-- url pattern
+1. 超时处理不正确，多客户访问崩溃
 
+* optimize performance from allocing memory by pool
+* url pattern
+* 文件读取优化,* sendfile
+* 优化程序阅读《computer system》中第五章「优化程序性能」
+* support IPv6
+* 为读套接字设计读低水位，减少不必要的唤醒
+* 改进锁的实现
+
++ linux 下 semaphore 文件存储于 /dev/shm/sem.xxx
++ 考虑超时节点的插入，来确定选取什么结构
+  添加超时是几乎有序的，采用 lru 结构!
+
+阅读源码需要关注的问题
+----------------------
+1. 超时处理
+2. free 和 重用 request 问题
+3. 是否时事件驱动
+4. 解析 HTTP 如何与事件循环结合
+etc
+
+
+已经大体阅读
+------------
+1. boa server
+  其采用类似于事件驱动来做，维护 request 链，解析处理 HTTP 通过内部状态机，没有高级特性
+  根据发送完毕来决定 free_request，其中通过请求的信息来判断是否时真的销毁这个 request，并且还有超时处理
+2. lighttpd
+  采用 server 这个结构体存储配置信息，对每个 connection 构建一个状态机
+3. nginx
+  采用 xxx_config 存储配置信息，主题结构维护在 cycle 里
+
+  事件循环
+  ngx_process_events_and_timers 处理事件，先找出即将超时的 timer，然后调用不同实现的 ngx_process_events(cycle, timer, flags)
+  然后 ngx_events_process_posted 处理 posted_accept_events 和 posted_events，并且在 posted_accept_events 后处理已经超时的链接
+  整个事件循环在 ngx_worker_process_cycle 里处理 cycle 和各种信号的标记
+  先抢锁在处理事件
+
+  连接 connection_t 里包含 http_connection 对象
+
+  设置为 nonblock 然后优先尝试读取一下，加快处理
+
+  超时处理时把 ev->timeout 标记，然后调用 ev->handle(ev) 处理，相关事件里会有处理超时的代码
+
+  事件结构体在初始化时通过 pool 来管理，而且使用了重用

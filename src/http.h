@@ -4,19 +4,19 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define HTTP_METADATA_LEN    4096
+#include "common.h"
+#include "buffer.h"
+#include "connection.h"
 
-#define CR     (uint8_t)'\r'
-#define LF     (uint8_t)'\n'
+#define HTTP_BUFFER_SIZE    4096
+
+#define CR     '\r'
+#define LF     '\n'
 #define CRLF   "\r\n"
 
-
-typedef struct string_st {
-    char const *str;
-    int len;
-} string_t;
-
-typedef struct cookie_st {
+#define HTTP_COOKIE_PAIR_MAX    12
+typedef struct cookie_t {
+    string_t cookie[HTTP_COOKIE_PAIR_MAX];
 } cookie_t;
 
 #define HTTP_GET     0
@@ -94,51 +94,48 @@ static char const * http_code_str[] = {
     NULL,
 };
 
-struct http_req {
-    int8_t method;
+struct http_header_in {
     int8_t version;
-    string_t lines[HTTP_LINE_MAX];
-    int range1, range2;
-    cookie_t cookies;
-
+    string_t host;
     uint8_t iscon:1;
     uint8_t ischunk:1;
 };
 
-struct http_res {
+struct http_header_req {
+    unsigned method;
+};
+
+struct http_header_res {
     int8_t code;
-    int8_t version;
-    int content_length;
-    cookie_t cookies;
-
-    uint8_t iscon:1;
-    uint8_t ischunk:1;
 };
 
-struct http_head {
-    int8_t   method;
-    int8_t   ver;
-    string_t lines[HTTP_LINE_MAX];
-    int content_length;
-    int range1, range2;
+/* a request struct */
+typedef struct http_request_t {
+    struct http_header_in header_in;    /* the common portion of header */
+    struct http_header_req req;         /* the rest header of requst */
+    struct http_header_res res;         /* the rest header of response */
 
-    int filesize;
+    connection_t con_req;
+    connection_t con_res;
 
-    int status_code;
-    uint8_t iscon:1;
-    uint8_t ischunk:1;
-    uint8_t _padding:5;
+    buffer_t *request_head;
+    buffer_t *request_body;
+    union {
+        buffer_t *response;
+        /* TODO complete http_request_t structure */
+    } response;
 
-    uint8_t _fin_lf:1;
-    int _line_type;
-    int _ps_status;  /* 解析状态 */
-    int _metadatalen;
-    int _metadataidx;
-    uint8_t _metadata[1];
-};
+    struct {
+        uint8_t fin_lf:1;
+        int line_type;
+        int status;             /* status of parsing */
+        char const *pos;        /* current position at the buffer */
+        char const *end;        /* end of the buffer */
+    } parse_status;
+} http_request_t;
 
-extern struct http_head *http_head_malloc(size_t metadatalen);
-extern void http_head_free(struct http_head **hd);
-extern int http_head_parse(struct http_head *hd, uint8_t const *buff, ssize_t len);
+extern http_request_t *http_request_new(int fd);
+extern void http_request_destroy(http_request_t **req);
+void http_init_request(void *req);
 
 #endif /* HTTP_H__ */

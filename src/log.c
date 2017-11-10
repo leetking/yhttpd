@@ -1,10 +1,12 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
+#include <pthread.h>
 
 #include "log.h"
 
-static int level = 2;
+static int level = LOG_INFO;
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 extern void yhttp_log_set(int l)
 {
@@ -28,11 +30,14 @@ extern void yhttp_log(int l, char const *str, ...)
         "[INFO]  ", "[DEBUG1]",
         "[DEBUG2]",
     };
-    printf("%s.%04d ", buff, (int)(rawtime.tv_nsec/1e9 * 1e4));
-    printf("%s ", strlevel[l]);
     va_list ap;
     va_start(ap, str);
+
+    pthread_mutex_lock(&lock);
+    printf("%s.%04d %s", buff, (int)(rawtime.tv_nsec/1e9 * 1e4), strlevel[l]);
     vprintf(str, ap);
+    pthread_mutex_unlock(&lock);
+
     va_end(ap);
 }
 
