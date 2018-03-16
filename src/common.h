@@ -9,7 +9,7 @@
 #define BUFF_SIZE   (2048)
 #define ACCEPT_LOCK "yhttp-"VER".lock"
 #define TIMEOUT     (10*1000)     /* 10 s */
-#define TIME_INTERVAL   (1000)    /* 1 s */
+#define TIME_INTERVAL   (1*1000)    /* 1 s */
 
 #define MAX(x, y)    ((x)>(y)? (x): (y))
 #define MIN(x, y)    ((x)<(y)? (x): (y))

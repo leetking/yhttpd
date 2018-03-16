@@ -163,7 +163,7 @@ extern int event_process(msec_t ms)
             FD_CLR(c->fd, &ENV.rdset2);
             FD_CLR(c->fd, &ENV.wrset2);
         }
-        /* no client and server fd need to lesten */
+        /* no client and server fd need to listen */
         if (0 == ENV.event_n) {
             tm.tv_sec  = TIME_INTERVAL/1000;
             tm.tv_usec = TIME_INTERVAL%1000*1000;
@@ -183,30 +183,32 @@ extern int event_process(msec_t ms)
     if (err || readyn == 0) {
         if (locked)
             sem_post(ENV.lock);
-        if (err && errno != EINTR)
+        /* if (err && errno != EINTR) */
+        if (err)
             yhttp_warn("select error: %s\n", strerror(errno));
         return err;
     }
 
     if (locked) {
-        for (int i = 0; i < ENV.event_acpt_n; i++) {
+        for (int i = 0; i < ENV.event_acpt_n && readyn; i++) {
             event_t *ev = ENV.events_acpt[i];
             connection_t *c = ev->data;
             /* accpet new request now */
             if (ev->read && FD_ISSET(c->fd, &ENV.rdset2)) {
+                readyn--;
                 ev->handle(ev);
             }
         }
         sem_post(ENV.lock);
     }
 
-    /* TODO don't process now events added */
     /* post event to ``posted_events'' */
-    for (int i = 0; i < ENV.event_n; i++) {
+    for (int i = 0; i < ENV.event_n && readyn; i++) {
         event_t *e = ENV.events[i];
         connection_t *c = e->data;
         if ((e->read && FD_ISSET(c->fd, &ENV.rdset2))
                 || (e->write && FD_ISSET(c->fd, &ENV.wrset2))) {
+            readyn--;
             event_post_event(&posted_events, e);
         }
     }

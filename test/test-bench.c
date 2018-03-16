@@ -1,32 +1,55 @@
-#include <string.h>
-#include <signal.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <signal.h>
 
 #include <unistd.h>
-#include <netinet/ip.h>
 #include <sys/socket.h>
-#include <fcntl.h>
-#include <semaphore.h>
+#include <netinet/in.h>
 
-#include "../src/worker.h"
-#include "../src/common.h"
-#include "../src/log.h"
+/**
+ * base line of testing performance
+ */
 
-sem_t *sem;
-int sfd;
+void quit(int _)
+{
+    printf("exit\n");
+    exit(0);
+}
+
+void run(int sfd)
+{
+    for (;;) {
+        int cfd;
+        struct sockaddr_in cip;
+        socklen_t clen = sizeof(cip);
+        
+        cfd = accept(sfd, (struct sockaddr*)&cip, &clen);
+        if (-1 == cfd) {
+            perror("accept");
+            continue;
+        }
+        /* just accpet and close */
+        close(cfd);
+    }
+}
 
 int main()
 {
-    yhttp_log_set(LOG_DEBUG2);
+    int sfd;
+    struct sockaddr_in sip;
+
+    signal(SIGINT, quit);
+
     sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (-1 == sfd) {
         perror("socket");
         return 1;
     }
-    struct sockaddr_in sip;
+
     memset(&sip, 0, sizeof(sip));
     sip.sin_family = AF_INET;
-    sip.sin_port = htons(8080);
+    sip.sin_port  = htons(8080);
     sip.sin_addr.s_addr = htonl(INADDR_ANY);
 
     printf("Listing on: 0.0.0.0:%d\n", 8080);
@@ -49,22 +72,9 @@ int main()
         return 1;
     }
 
-    sem = sem_open(ACCEPT_LOCK, O_CREAT, 0600, 1);
-    if (SEM_FAILED == sem) {
-        perror("init lock");
-        goto err;
-    }
+    run(sfd);
 
-    run_worker(1, sfd);
-
-err:
-    sem_close(sem);
-    sem_unlink(ACCEPT_LOCK);
     close(sfd);
-    
-    printf("test-worker exit normal\n");
-    exit(0);
 
     return 0;
 }
-

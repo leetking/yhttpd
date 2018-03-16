@@ -29,11 +29,12 @@ extern int event_process_posted(list_t *queue)
 {
     event_t *ev;
     list_t *l, *n;
+    /* @ev may be freed via event_del(ev, XXXX) */
     list_foreach_safe(queue, l, n) {
-        list_del(l);
         ev = list_entry(l, event_t, posted);
         ev->handle(ev);
     }
+    LIST_INIT(queue);
 
     return 0;
 }
