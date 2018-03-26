@@ -36,7 +36,7 @@ static char quit = 0;
 
 static void help(int argc, char **argv)
 {
-    printf("usage: %s [OPTION]\n"
+    printf("usage: %s [OPTIONS]\n"
            "a sample http server, for studing.\n"
            "OPTIONS:\n"
            "      -r path    set `www` directory, default current directory(.)\n"
@@ -49,8 +49,8 @@ static void help(int argc, char **argv)
            "      -v <1,2>   verbose.\n"
            "      -h         show this page.\n"
            "\n"
-           "%s %s\n"
-           "(c) GPL v3\n"
+           "%s v%s\n"
+           "(C) GPL v3\n"
            "Author: leetking <li_Tking@63.com>\n",
            argv[0], argv[0], VER);
 }
@@ -93,17 +93,6 @@ static int parse_opt(int argc, char **argv)
         }
     }
     return ret;
-}
-
-static void set_nonblock(int fd)
-{
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (-1 == flags) {
-        yhttp_warn("Master# Get fd(%d) status error: %s\n", fd, strerror(errno));
-        return;
-    }
-    if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
-        yhttp_warn("Master# Set fd(%d) as nonblock error: %s\n", fd, strerror(errno));
 }
 
 static void kill_workers(int _)
@@ -220,9 +209,6 @@ int main(int argc, char **argv)
                 yhttp_info("Master# Restart work process %d# success (%d -> %d)\n", id, pid, neopid);
             }
         }
-
-        /* FIXME remove sleep(2) */
-        sleep(2);
     }
 
     sem_unlink(ACCEPT_LOCK);

@@ -9,7 +9,8 @@ MKDIR := mkdir -p
 CFLAGS  := -DVER=\"$(VER)\" -MMD -MP
 LDFLAGS := -lpthread
 
-CFLAGS_DEBUG    := -g3 -O0 -DDEBUG -Wall -Wno-unused -Wformat -fsanitize=address
+CFLAGS_DEBUG    := -g3 -O0 -DDEBUG -Wall -Wno-unused -Wno-format-truncation -Wformat \
+	-DYHTTP_DEBUG -fsanitize=address
 LDFLAGS_DEBUG   := -fsanitize=address
 CFLAGS_RELEASE  := -O2 -DNDEBUG -g -Wall -Werror
 LDFLAGS_RELEASE :=

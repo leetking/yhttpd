@@ -6,9 +6,9 @@
 #include "common.h"
 #include "list.h"
 
+extern list_t accept_events;
 extern list_t posted_events;
 extern list_t timeout_list;
-extern msec_t current_msec;
 
 typedef struct event_t event_t;
 typedef void event_cb_t(event_t *ev);
@@ -16,9 +16,9 @@ typedef void event_cb_t(event_t *ev);
 struct event_t {
     void *data;
     event_cb_t *handle;
-    int index;
     list_t posted;
     list_t timer;
+    int index;
     uint8_t accept:1;
     uint8_t read:1;
     uint8_t write:1;
@@ -45,7 +45,6 @@ extern void process_all_events();
 extern msec_t event_min_timer();
 extern void event_add_timer(event_t *ev);
 extern void event_del_timer(event_t *ev);
-extern msec_t event_update_time();
 extern void event_process_expire();
 
 #define EVENT_TIMER_INF     ((msec_t)-1)

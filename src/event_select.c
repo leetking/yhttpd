@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <semaphore.h>
 
+#include "http_time.h"
 #include "common.h"
 #include "event.h"
 #include "log.h"
@@ -43,13 +44,17 @@ extern int event_init()
         yhttp_error("init semaphore error: %s\n", strerror(errno));
         return -1;
     }
-    event_update_time();
+    http_update_time();
 
     return 0;
 }
 
 int event_add(event_t *ev, int event)
 {
+    BUG_ON(NULL == ev);
+    BUG_ON(NULL == ev->data);
+    BUG_ON(event != EVENT_READ && event != EVENT_WRITE);
+
     connection_t *c = ev->data;
     fd_set *fdset;
     event_t **events = ENV.events;
@@ -82,6 +87,10 @@ int event_add(event_t *ev, int event)
 
 extern int event_del(event_t *ev, int event)
 {
+    BUG_ON(NULL == ev);
+    BUG_ON(NULL == ev->data);
+    BUG_ON(event != EVENT_READ && event != EVENT_WRITE);
+
     connection_t *c = ev->data;
     event_t **events = ENV.events;
     int *event_n = &ENV.event_n;
@@ -146,7 +155,7 @@ extern int event_process(msec_t ms)
     if (0 == st) {
         locked = 1;
     } else if (-1 == st) {
-        yhttp_error("sem_trywait error: %s\n", strerror(errno));
+        yhttp_debug2("sem_trywait can lock: %s\n", strerror(errno));
     }
 
     if (locked && fresh_maxfd) {
@@ -161,7 +170,6 @@ extern int event_process(msec_t ms)
         for (int i = 0; i < ENV.event_acpt_n; i++) {
             connection_t *c = ENV.events_acpt[i]->data;
             FD_CLR(c->fd, &ENV.rdset2);
-            FD_CLR(c->fd, &ENV.wrset2);
         }
         /* no client and server fd need to listen */
         if (0 == ENV.event_n) {
@@ -184,7 +192,7 @@ extern int event_process(msec_t ms)
         if (locked)
             sem_post(ENV.lock);
         /* if (err && errno != EINTR) */
-        if (err)
+        if (err && EINTR != errno)
             yhttp_warn("select error: %s\n", strerror(errno));
         return err;
     }
@@ -196,7 +204,7 @@ extern int event_process(msec_t ms)
             /* accpet new request now */
             if (ev->read && FD_ISSET(c->fd, &ENV.rdset2)) {
                 readyn--;
-                ev->handle(ev);
+                event_post_event(&accept_events, ev);
             }
         }
         sem_post(ENV.lock);

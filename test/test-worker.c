@@ -15,7 +15,7 @@
 sem_t *sem;
 int sfd;
 
-int main()
+int main(int argc, char **argv)
 {
     yhttp_log_set(LOG_DEBUG2);
     sfd = socket(AF_INET, SOCK_STREAM, 0);

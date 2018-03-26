@@ -6,12 +6,15 @@
 #include "log.h"
 
 static int level = LOG_INFO;
-static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 extern void yhttp_log_set(int l)
 {
     if (l < LOG_ERROR || l > LOG_DEBUG2) return;
     level = l;
+}
+extern int yhttp_log_get(void)
+{
+    return level;
 }
 
 extern void yhttp_log(int l, char const *str, ...)
@@ -33,10 +36,8 @@ extern void yhttp_log(int l, char const *str, ...)
     va_list ap;
     va_start(ap, str);
 
-    pthread_mutex_lock(&lock);
     printf("%s.%04d %s", buff, (int)(rawtime.tv_nsec/1e9 * 1e4), strlevel[l]);
     vprintf(str, ap);
-    pthread_mutex_unlock(&lock);
 
     va_end(ap);
 }

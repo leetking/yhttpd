@@ -5,10 +5,11 @@
 #include "memory.h"
 #include "event.h"
 #include "connection.h"
+#include "http_time.h"
 
+LIST_NEW(accept_events);
 LIST_NEW(posted_events);
 LIST_NEW(timeout_list);
-msec_t current_msec;
 
 extern event_t *event_malloc(void)
 {
@@ -25,8 +26,20 @@ extern void event_free(event_t *ev)
     yhttp_free(ev);
 }
 
+static void event_process_accept(list_t *queue)
+{
+    event_t *ev;
+    list_t *l;
+    list_foreach(queue, l) {
+        ev = list_entry(l, event_t, posted);
+        ev->handle(ev);
+    }
+    LIST_INIT(queue);
+}
 extern int event_process_posted(list_t *queue)
 {
+    BUG_ON(NULL == queue);
+
     event_t *ev;
     list_t *l, *n;
     /* @ev may be freed via event_del(ev, XXXX) */
@@ -46,10 +59,11 @@ extern void process_all_events()
 
     event_process(timer);
 
-    event_update_time();
+    http_update_time();
 
     event_process_expire();
 
+    event_process_accept(&accept_events);
     event_process_posted(&posted_events);
 }
 
@@ -89,13 +103,4 @@ extern void event_del_timer(event_t *ev)
     ev->timeout_set = 0;
     list_del(&ev->timer);
 }
-
-extern msec_t event_update_time()
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    current_msec = 1000*tv.tv_sec + tv.tv_usec/1000;
-    return current_msec;
-}
-
 

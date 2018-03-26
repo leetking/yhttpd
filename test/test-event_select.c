@@ -9,7 +9,7 @@
 
 static int loop_quit = 0;
 
-static void echo(void *x)
+static void echo(event_t *ev)
 {
     char buffer[512];
     int rdn = read(STDIN_FILENO, buffer, 512);

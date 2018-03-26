@@ -4,8 +4,8 @@ VER := test
 SANITIZE :=
 SANITIZE := -fsanitize=address
 
-CFLAGS  := -g -Wall -Wno-unused -O0 -MMD -MP -DVER=\"$(VER)\" \
-	$(SANITIZE)
+CFLAGS  := -g -Wall -Wno-format-truncation -Wno-unused -O0 -MMD -MP -DVER=\"$(VER)\" \
+	-DYHTTP_DEBUG $(SANITIZE)
 LDFLAGS := -lpthread $(SANITIZE)
 
 SRCS := $(filter-out ../src/yhttp.c, $(wildcard ../src/*.c))
@@ -13,7 +13,7 @@ OBJS := $(SRCS:.c=.c.o)
 DEPS := $(SRCS:.c=.c.d)
 
 TEST_OBJS := test-log test-event_select test-worker \
-	test-http test-list
+	test-http_parser test-list test-http_error_page
 TEST_ALONE := test-bench
 
 all: $(TEST_OBJS)

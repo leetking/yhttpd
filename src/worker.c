@@ -51,6 +51,7 @@ extern int run_worker(int id, int sfd)
     ENV.quit = 0;
 
     event_init();
+    http_init();
 
     rev = event_malloc();
     if (!rev) {
@@ -64,13 +65,16 @@ extern int run_worker(int id, int sfd)
         ret = 2;
         goto con_err;
     }
+
+    c->fd = ENV.sfd;
+    c->rev = rev;
     rev->handle = event_accept_request;
     rev->data = c;
     rev->accept = 1;
     
-    c->fd = ENV.sfd;
     event_add(rev, EVENT_READ);
     for (;;) {
+        /* TODO handle all master's instructions */
         if (ENV.quit)
             break;
 
@@ -86,6 +90,7 @@ extern int run_worker(int id, int sfd)
 con_err:
     event_free(rev);
 rev_err:
+    http_destroy();
     event_quit();
 
     return ret;
