@@ -21,6 +21,7 @@
 #include "http_mime.h"
 
 #include "http_page.h"
+#include "http_file.h"
 #include "http_error_page.h"
 #include "http_cache.h"
 
@@ -106,8 +107,8 @@ timeout:
     event_del(rev, EVENT_READ);
     event_del_timer(rev);
     close(c->fd);
-    connection_free(c);
     event_free(rev);
+    connection_free(c);
 }
 
 /**
@@ -195,8 +196,8 @@ free_request:
     event_del_timer(rev);
     http_request_free(req);
     close(c->fd);
-    connection_free(c);
     event_free(rev);
+    connection_free(c);
 }
 
 extern void http_init_error_page(event_t *sev)
@@ -301,8 +302,8 @@ free_request:
     event_del_timer(sev);
     http_request_free(req);
     close(c->fd);
-    connection_free(c);
     event_free(sev);
+    connection_free(c);
 }
 
 void http_init_static_file(event_t *sev)
@@ -312,11 +313,10 @@ void http_init_static_file(event_t *sev)
     connection_t *fc;
     connection_t *sc = sev->data;
     http_request_t *req = sc->data;
+    struct http_head_com *com = &req->com;
+    struct http_head_res *res = &req->res;
     http_file_t *file = &req->backend.file;
     char uri[PATH_MAX];
-
-    req->pos = 0;
-    req->size = file->stat.st_size;
 
     if (1 == req->req.uri.len && '/' == req->req.uri.str[0]) {
         snprintf(uri, PATH_MAX, "%s/index.html", SETTING.root_path);
@@ -358,6 +358,14 @@ void http_init_static_file(event_t *sev)
     fc->rev = fev;
     fev->handle = event_read_file;
     event_add(fev, EVENT_READ);
+
+    req->pos = 0;
+    req->size = file->stat.st_size;
+    com->last_modified = file->stat.st_ctim.tv_sec;
+    com->content_length = req->size;
+    com->pragma = HTTP_PRAGMA_UNSET;
+    com->content_type = http_mimes[MIME_TEXT_HTML];
+    com->transfer_encoding = HTTP_UNCHUNKED;
 
     http_build_response_head(req);
 
@@ -425,14 +433,14 @@ extern void event_read_file(event_t *fev)
     http_request_t *req = sc->data;
     buffer_t *b = req->response_buffer;
     http_file_t *file = &req->backend.file;
+    struct http_head_com *com = &req->com;
+    struct http_head_res *res = &req->res;
 
     BUG_ON(NULL == sev);
     BUG_ON(NULL == sev->data);
     BUG_ON(NULL == sc->data);
     BUG_ON(NULL == b);
     BUG_ON(NULL == fev);
-
-    BUG_ON(b->pos < b->last);
 
 #if 0
     /* There is the rest data */
@@ -456,7 +464,13 @@ extern void event_read_file(event_t *fev)
             return;
         }
         if (YHTTP_ERROR == rdn) {
-            /* TODO close file */
+            yhttp_debug2("read file error\n");
+            event_del(fev, EVENT_READ);
+            close(fc->fd);
+            event_free(fev);
+            connection_free(fc);
+            res->code = HTTP_500;
+            http_init_error_page(sev);
             return;
         }
 
@@ -467,8 +481,8 @@ extern void event_read_file(event_t *fev)
         if (req->pos == req->size) {
             fc->rd_eof = 1;
             yhttp_debug2("read finish\n");
-            event_add(sev, EVENT_WRITE);
             event_del(fev, EVENT_READ);
+            event_add(sev, EVENT_WRITE);
             return;
         }
     }
@@ -490,17 +504,55 @@ extern void event_send_file(event_t *sev)
         if (YHTTP_AGAIN == wrn)
             continue;
         if (YHTTP_BLOCK == wrn) {
-            event_add(fev, EVENT_READ);
-            event_del(sev, EVENT_WRITE);
+            yhttp_debug2("write block error\n");
             return;
         }
         if (YHTTP_ERROR == wrn) {
-            return;
+            yhttp_debug2("write file error\n");
+            goto free_request;
         }
 
         b->pos += wrn;
 
-        if (b->pos == b->last)
+        if (b->pos == b->last) {
+            if (fc->rd_eof) {
+                yhttp_debug("Client %d reqeust file finish\n", sc->fd);
+                if (!req->com.connection) {
+                    yhttp_debug("Client %d close connection\n", sc->fd);
+                    goto free_request;
+                }
+
+                yhttp_debug("Client %d request reuse\n", sc->fd);
+                event_free(fev);
+                connection_free(fc);
+                http_request_reuse(req);
+                event_del_timer(sev);
+                sc->tmstamp = current_msec+TIMEOUT;
+                event_add_timer(sev);
+                event_del(sev, EVENT_WRITE);
+                sev->handle = event_parse_http_head;
+                event_add(sev, EVENT_READ);
+                return;
+            }
+
             buffer_init(b);
+            event_add(fev, EVENT_READ);
+            event_del(sev, EVENT_WRITE);
+        }
     }
+    return;
+
+free_request:
+    /* close file */
+    close(fc->fd);
+    event_free(fev);
+    connection_free(fc);
+    /* close network connection */
+    event_del(sev, EVENT_WRITE);
+    event_del_timer(sev);
+    http_request_free(req);
+    close(sc->fd);
+    event_free(sev);
+    connection_free(sc);
 }
+

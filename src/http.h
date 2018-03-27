@@ -11,6 +11,7 @@
 #include "buffer.h"
 #include "connection.h"
 #include "http_page.h"
+#include "http_file.h"
 
 #define HTTP_BUFFER_SIZE        4096
 #define HTTP_LARGE_BUFFER_SIZE  (2*HTTP_BUFFER_SIZE)
@@ -154,11 +155,6 @@ struct http_head_res {
     string_t vary;
     string_t www_authenticate;
 };
-
-typedef struct http_file_t {
-    struct stat stat;
-    connection_t *duct;                 /* a static file or a pipe */
-} http_file_t;
 
 /* a request struct */
 typedef struct http_request_t {

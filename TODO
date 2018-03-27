@@ -1,17 +1,19 @@
-* 能响应 GET 请求
-
-* 对于 force 请求性能不正常
+* 改进请求分发
 
 * 回应如何设计，内存缓冲，文件读，FastCGI 接口
 * 如何设计配置文件，并且提供一个无需配置文件的运行
-* 负载均衡
-* optimize performance from allocing memory by pool
 * url pattern
+
+* optimize performance from allocing memory by pool
+* 负载均衡
 * 文件读取优化, sendfile
 * 优化程序阅读《computer system》中第五章「优化程序性能」
 * support IPv6
 * 为读套接字设计读低水位，减少不必要的唤醒
 * 改进锁的实现
+* 对于 force 请求性能不正常
+* http_parse_request_head 可以优化
+
 
 * HTTP/0.9 如何工作
   不保持链接，无法协商内容，不返回媒体类型
