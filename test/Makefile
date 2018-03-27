@@ -13,7 +13,8 @@ OBJS := $(SRCS:.c=.c.o)
 DEPS := $(SRCS:.c=.c.d)
 
 TEST_OBJS := test-log test-event_select test-worker \
-	test-http_parser test-list test-http_error_page
+	test-http_parser test-list test-http_error_page \
+	test-hash test-http_url
 TEST_ALONE := test-bench
 
 all: $(TEST_OBJS)

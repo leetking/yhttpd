@@ -6,21 +6,30 @@
 #include "buffer.h"
 #include "http.h"
 #include "http_parser.h"
-#include "http_cache.h"
 #include "http_page.h"
 #include "http_error_page.h"
 #include "http_time.h"
+#include "http_mime.h"
 
 extern int http_init()
 {
-    http_error_page_init(NULL);
+    if (YHTTP_OK != http_error_page_init(NULL))
+        goto error_page_err;
+    if (YHTTP_OK != http_parse_init())
+        goto parse_init_err;
 
     return YHTTP_OK;
+
+parse_init_err:
+    http_error_page_destroy();
+error_page_err:
+    return YHTTP_ERROR;
 }
 
 extern void http_destroy()
 {
     http_error_page_destroy();
+    http_parse_destroy();
 }
 
 extern void http_request_reuse(http_request_t *req)
@@ -35,10 +44,10 @@ extern http_request_t *http_request_malloc()
     req = yhttp_malloc(sizeof(*req));
     if (!req)
         return req;
-    req->request_head = buffer_malloc(HTTP_BUFFER_SIZE);
+    req->request_head = buffer_malloc(HTTP_BUFFER_SIZE_CFG);
     if (!req->request_head)
         goto req_head_err;
-    req->response_buffer = buffer_malloc(HTTP_BUFFER_SIZE);
+    req->response_buffer = buffer_malloc(HTTP_BUFFER_SIZE_CFG);
     if (!req->response_buffer)
         goto req_head_err;
 
@@ -98,6 +107,7 @@ extern int http_build_response_head(http_request_t *r)
     string_t const *reason = &page->reason;
     int len;
     struct tm *gmt;
+    string_t const *mime;
 
     BUG_ON(NULL == page);
     if (HTTP09 == com->version)
@@ -151,8 +161,9 @@ extern int http_build_response_head(http_request_t *r)
     resb->last += len;
 
     /* Content Type */
+    mime = &http_mimes[com->content_type];
     len = snprintf(resb->last, buffer_rest(resb), "Content-Type: %.*s"CRLF,
-            com->content_type.len, com->content_type.str);
+            mime->len, mime->str);
     resb->last += len;
 
     if (HTTP11 == com->version) {

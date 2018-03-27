@@ -62,7 +62,7 @@ static int parse_opt(int argc, char **argv)
     while ((c = getopt(argc, argv, "r:p:dc:w:e:l:v:h")) != -1) {
         switch (c) {
         case 'r':
-            strncpy(SETTING.root_path, optarg, strlen(optarg));
+            //strncpy(SETTING.root_path, optarg, strlen(optarg));
             yhttp_debug2("Master# path of root: %s\n", SETTING.root_path);
             break;
         case 'p':

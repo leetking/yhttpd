@@ -1,8 +1,10 @@
 * 改进请求分发
+* 整理事件处理逻辑
+
+* url pattern 采用 lua 的匹配方法
 
 * 回应如何设计，内存缓冲，文件读，FastCGI 接口
 * 如何设计配置文件，并且提供一个无需配置文件的运行
-* url pattern
 
 * optimize performance from allocing memory by pool
 * 负载均衡

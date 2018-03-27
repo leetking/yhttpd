@@ -13,14 +13,14 @@
 #include "http_page.h"
 #include "http_file.h"
 
-#define HTTP_BUFFER_SIZE        4096
-#define HTTP_LARGE_BUFFER_SIZE  (2*HTTP_BUFFER_SIZE)
+#define HTTP_BUFFER_SIZE_CFG        4096
+#define HTTP_LARGE_BUFFER_SIZE_CFG  (2*HTTP_BUFFER_SIZE_CFG)
 
 #define CR     '\r'
 #define LF     '\n'
 #define CRLF   "\r\n"
 
-#define HTTP_COOKIE_PAIR_MAX    12
+#define HTTP_COOKIE_PAIR_MAX_CFG    12
 
 #define HTTP_GET     0x001  /* HTTP/1.0 */
 #define HTTP_POST    0x002  /* HTTP/1.0 */
@@ -91,14 +91,13 @@ struct http_head_com {
     int content_length;
     int content_range1, content_range2;
     string_t content_md5;
-    string_t content_type;
 
     time_t expires;
     time_t last_modified;
     time_t date;
 
     string_t str_cookie;
-    str_pairt_t cookies[HTTP_COOKIE_PAIR_MAX];
+    str_pairt_t cookies[HTTP_COOKIE_PAIR_MAX_CFG];
     uint8_t keep_alive;
 
     unsigned version:2;
@@ -109,6 +108,7 @@ struct http_head_com {
     unsigned allow:10;              /* method */
     unsigned trailer:1;             /* dont support */
     unsigned content_encoding:4;    /* only support identity */
+    unsigned content_type:10;       /* mime */
 };
 
 /* TODO optimize structure http_head_req */
@@ -117,6 +117,7 @@ struct http_head_req {
     uint16_t port;
     string_t uri;
     string_t uri_params;
+    string_t suffix;
     string_t query;
 
     unsigned accept:2;

@@ -19,7 +19,7 @@
 /* 0.1 s */
 #define LOOP_TIMEOUT    ((int)1e5)
 
-struct env {
+static struct env {
     int id;
     int sfd;
     uint8_t quit:1;
@@ -50,8 +50,14 @@ extern int run_worker(int id, int sfd)
     ENV.id   = id;
     ENV.quit = 0;
 
-    event_init();
-    http_init();
+    if (YHTTP_OK != event_init()) {
+        yhttp_error("%d# Init event error\n");
+        return 1;
+    }
+    if (YHTTP_OK != http_init()) {
+        yhttp_error("%d# Init http error\n");
+        goto init_err;
+    }
 
     rev = event_malloc();
     if (!rev) {
@@ -91,6 +97,7 @@ con_err:
     event_free(rev);
 rev_err:
     http_destroy();
+init_err:
     event_quit();
 
     return ret;

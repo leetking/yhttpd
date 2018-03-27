@@ -34,6 +34,7 @@ static void test_http10(void)
                     /* Expiers: time */
                     "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36"CRLF
                     CRLF;
+    http_parse_init();
     http_request_t *req = http_request_malloc();
     if (!req) {
         printf("http_request_malloc error\n");
@@ -55,10 +56,12 @@ static void test_http10(void)
     assert(0 == strncmp("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36",
                 req->req.user_agent.str, req->req.user_agent.len));
     assert(HTTP_PRAGMA_NO_CACHE == req->com.pragma);
+    assert(0 == strncmp("html", req->req.suffix.str, req->req.suffix.len));
 
     assert(!req->com.connection);
 
     http_request_free(req);
+    http_parse_destroy();
     printf("Test http request http/1.0 passed\n");
 }
 
@@ -68,6 +71,7 @@ static void test_http_head1(void)
     char reqstr[] = "GET /vim HTTP/1.1"CRLF
                     "Host: localhost:8080"CRLF
                     CRLF;
+    http_parse_init();
     http_request_t *req = http_request_malloc();
     req->parse_state = HTTP_PARSE_INIT;
     req->parse_pos = NULL;
@@ -81,6 +85,7 @@ static void test_http_head1(void)
     assert(req->com.connection);
 
     http_request_free(req);
+    http_parse_destroy();
 
     printf("Test http request 1 passed\n");
 }
@@ -93,6 +98,7 @@ static void test_http_head2(void)
                     "Connection: close"CRLF
                     CRLF;
     int split = 17;
+    http_parse_init();
     http_request_t *req = http_request_malloc();
     req->parse_state = HTTP_PARSE_INIT;
     req->parse_pos = NULL;
@@ -106,6 +112,7 @@ static void test_http_head2(void)
     assert(!req->com.connection);
 
     http_request_free(req);
+    http_parse_destroy();
     printf("Test http request 2 passed\n");
 }
 
@@ -123,6 +130,7 @@ static void test_http_head3(void)
                     "Accept-Encoding: gzip, deflate"CRLF
                     "Accept-Language: zh-CN"CRLF
                     CRLF;
+    http_parse_init();
     http_request_t *req = http_request_malloc();
     req->parse_state = HTTP_PARSE_INIT;
     req->parse_pos = NULL;
@@ -136,6 +144,7 @@ static void test_http_head3(void)
     assert((HTTP_GZIP|HTTP_DEFLATE|HTTP_IDENTITY) == req->req.accept_encoding);
 
     http_request_free(req);
+    http_parse_destroy();
     printf("Test http request 3 passed\n");
 }
 
@@ -147,6 +156,7 @@ static void test_http_head4(void)
                     "Host: 127.0.0.1"CRLF
                     "Connection: close"CRLF
                     CRLF;
+    http_parse_init();
     http_request_t *req = http_request_malloc();
     req->parse_state = HTTP_PARSE_INIT;
     req->parse_pos = NULL;
@@ -156,6 +166,7 @@ static void test_http_head4(void)
     assert(0 == strncmp("p1=v1&p2=v2", req->req.query.str, req->req.query.len));
 
     http_request_free(req);
+    http_parse_destroy();
     printf("Test http request 4 passed\n");
 }
 

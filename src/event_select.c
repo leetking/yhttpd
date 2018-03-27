@@ -173,8 +173,8 @@ extern int event_process(msec_t ms)
         }
         /* no client and server fd need to listen */
         if (0 == ENV.event_n) {
-            tm.tv_sec  = TIME_INTERVAL/1000;
-            tm.tv_usec = TIME_INTERVAL%1000*1000;
+            tm.tv_sec  = TIME_INTERVAL_CFG/1000;
+            tm.tv_usec = TIME_INTERVAL_CFG%1000*1000;
             ptm = &tm;
         }
     }

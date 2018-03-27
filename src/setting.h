@@ -3,12 +3,18 @@
 
 #include <linux/limits.h>
 
-typedef struct setting_t {
-    char root_path[PATH_MAX];
-    char cgi_path[PATH_MAX];
-    char error_page_path[PATH_MAX];
-} setting_t;
+#include "common.h"
 
-extern setting_t SETTING;
+struct setting_t {
+    string_t root_path;
+    string_t cgi_path;
+    string_t error_page_path;
+
+    string_t fcgi_pattern;
+
+    unsigned enable_fcgi:1;
+};
+
+extern struct setting_t SETTING;
 
 #endif

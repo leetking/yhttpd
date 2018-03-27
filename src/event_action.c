@@ -19,11 +19,10 @@
 #include "setting.h"
 #include "http_time.h"
 #include "http_mime.h"
-
+#include "http_url.h"
 #include "http_page.h"
 #include "http_file.h"
 #include "http_error_page.h"
-#include "http_cache.h"
 
 extern void event_accept_request(event_t *rev)
 {
@@ -54,7 +53,7 @@ extern void event_accept_request(event_t *rev)
     c->fd = cfd;
     c->rev = ev;
     c->read = connection_read;
-    c->tmstamp = current_msec+TIMEOUT;
+    c->tmstamp = current_msec+TIMEOUT_CFG;
 
     ev->accept = 0;
     ev->data = c;
@@ -139,7 +138,7 @@ extern void event_parse_http_head(event_t *rev)
             break;
         rbuffer->last += rdn;
         event_del_timer(rev);               /* update timer */
-        c->tmstamp = current_msec+TIMEOUT;
+        c->tmstamp = current_msec+TIMEOUT_CFG;
         event_add_timer(rev);
 
         if (rbuffer->last >= rbuffer->end) {
@@ -151,7 +150,7 @@ extern void event_parse_http_head(event_t *rev)
                 http_init_error_page(rev);
                 return;
             }
-            b = buffer_malloc(HTTP_LARGE_BUFFER_SIZE);
+            b = buffer_malloc(HTTP_LARGE_BUFFER_SIZE_CFG);
             if (!b) {
                 yhttp_debug("allocate memory for http_large_buffer error\n");
                 req->res.code = HTTP_500;
@@ -177,7 +176,14 @@ extern void event_parse_http_head(event_t *rev)
         }
 
         if (state == YHTTP_OK) {
+            struct http_head_req *r = &req->req;
             yhttp_debug("Http parse reqeust finish successfully\n");
+            if (SETTING.enable_fcgi
+                    && http_url_match(r->uri.str, r->uri.len,
+                        SETTING.fcgi_pattern.str, SETTING.fcgi_pattern.len)) {
+                yhttp_debug("forward to fcgi\n");
+            }
+
             if (YHTTP_OK == http_check_request(req)) {
                 yhttp_debug("Http request checking 1 passed\n");
                 http_init_response(rev);
@@ -219,7 +225,7 @@ extern void http_init_error_page(event_t *sev)
         com->connection = 0;
     com->transfer_encoding = HTTP_UNCHUNKED;
     com->content_length = req->size;
-    com->content_type = http_mimes[MIME_TEXT_HTML];
+    com->content_type = MIME_TEXT_HTML;
 
     http_build_response_head(req);
 
@@ -287,7 +293,7 @@ extern void event_respond_error_page(event_t *sev)
                 yhttp_debug("Client %d reuse\n", c->fd);
                 http_request_reuse(req);
                 event_del_timer(sev);
-                c->tmstamp = current_msec+TIMEOUT;
+                c->tmstamp = current_msec+TIMEOUT_CFG;
                 event_add_timer(sev);
                 event_del(sev, EVENT_WRITE);
                 sev->handle = event_parse_http_head;
@@ -319,10 +325,12 @@ void http_init_static_file(event_t *sev)
     char uri[PATH_MAX];
 
     if (1 == req->req.uri.len && '/' == req->req.uri.str[0]) {
-        snprintf(uri, PATH_MAX, "%s/index.html", SETTING.root_path);
+        snprintf(uri, PATH_MAX, "%.*s/index.html",
+                SETTING.root_path.len, SETTING.root_path.str);
     } else {
-        snprintf(uri, PATH_MAX, "%s%.*s",
-                SETTING.root_path, req->req.uri.len, req->req.uri.str);
+        snprintf(uri, PATH_MAX, "%.*s%.*s",
+                SETTING.root_path.len, SETTING.root_path.str,
+                req->req.uri.len, req->req.uri.str);
     }
 
     fd = open(uri, O_RDONLY);
@@ -364,7 +372,7 @@ void http_init_static_file(event_t *sev)
     com->last_modified = file->stat.st_ctim.tv_sec;
     com->content_length = req->size;
     com->pragma = HTTP_PRAGMA_UNSET;
-    com->content_type = http_mimes[MIME_TEXT_HTML];
+    com->content_type = MIME_TEXT_HTML;
     com->transfer_encoding = HTTP_UNCHUNKED;
 
     http_build_response_head(req);
@@ -388,10 +396,12 @@ extern void http_init_response(event_t *ev)
     char uri[PATH_MAX];
 
     if (1 == req->req.uri.len && '/' == req->req.uri.str[0]) {
-        snprintf(uri, PATH_MAX, "%s/index.html", SETTING.root_path);
+        snprintf(uri, PATH_MAX, "%.*s/index.html",
+                SETTING.root_path.len, SETTING.root_path.str);
     } else {
-        snprintf(uri, PATH_MAX, "%s%.*s",
-                SETTING.root_path, req->req.uri.len, req->req.uri.str);
+        snprintf(uri, PATH_MAX, "%.*s%.*s",
+                SETTING.root_path.len, SETTING.root_path.str,
+                req->req.uri.len, req->req.uri.str);
     }
 
     if (-1 == stat(uri, st)) {
@@ -527,7 +537,7 @@ extern void event_send_file(event_t *sev)
                 connection_free(fc);
                 http_request_reuse(req);
                 event_del_timer(sev);
-                sc->tmstamp = current_msec+TIMEOUT;
+                sc->tmstamp = current_msec+TIMEOUT_CFG;
                 event_add_timer(sev);
                 event_del(sev, EVENT_WRITE);
                 sev->handle = event_parse_http_head;

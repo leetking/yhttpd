@@ -7,10 +7,15 @@
 #include "log.h"
 #include "common.h"
 #include "http_parser.h"
+#include "hash.h"
+
+static struct env {
+    hash_t hdr_fields;
+} ENV;
 
 enum {
     /* General-Header */
-    HDR_CACHE_CONTROL,
+    HDR_CACHE_CONTROL = 1,
     HDR_CONNECTION,
     HDR_DATE,                   /* 1.0 */
     HDR_PRAGMA,                 /* 1.0 */
@@ -275,21 +280,19 @@ static int http_parse_key_of_hdr(http_request_t *r, char *start, char *end)
     int len = end-start;
     string_tolower(start, len);
     yhttp_debug2("key: %.*s\n", len, start);
-    for (size_t i = 0; i < ARRSIZE(hdr_keys); i++) {
-        if (len == hdr_keys[i].key.len && !strncmp(hdr_keys[i].key.str, start, len)) {
-            r->hdr_type = hdr_keys[i].id;
-            return YHTTP_AGAIN;
-        }
+    void *x = hash_getk(ENV.hdr_fields, start, len);
+    if (NULL == x) {
+        yhttp_debug2("don't header key: %.*s\n", len, start);
+        return YHTTP_ERROR;
     }
-    yhttp_debug2("don't header key: %.*s\n", len, start);
-    return YHTTP_ERROR;
+    r->hdr_type = (uint8_t)((intptr_t)x&0xff);
+    return YHTTP_AGAIN;
 }
 
 static int http_parse_value_of_hdr(http_request_t *r, char const *start, char const *end)
 {
     struct http_head_req *req = &r->req;
     struct http_head_com *com = &r->com;
-    char tchr;
     int len = end-start;
     yhttp_debug2("value: %.*s\n", len, start);
     switch (r->hdr_type) {
@@ -405,6 +408,23 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
         return YHTTP_ERROR;
     }
     return YHTTP_AGAIN;
+}
+
+static void http_parse_file_suffix(http_request_t *r, char const *start, char const *end)
+{
+#define SUFFIX_LEN 5
+    struct http_head_req *req = &r->req;
+    req->suffix.str = NULL;
+    req->suffix.len = 0;
+    if (start < end-SUFFIX_LEN)
+        start = end-SUFFIX_LEN;
+    for (; start < end; start++) {
+        if ('.' == *start) {
+            req->suffix.str = start+1;
+            req->suffix.len = end-start-1;
+            return;
+        }
+    }
 }
 
 /**
@@ -615,9 +635,10 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
         case PS_URI_IN:
             if (isprint(*p) && '?' != *p && ';' != *p && !isspace(*p))
                 break;
-            if (' ' == *p || ' ' == *p || ';' == *p) {
+            if (' ' == *p || '?' == *p || ';' == *p) {
                 req->uri.str = pos;
                 req->uri.len = p-pos;
+                http_parse_file_suffix(r, pos, p);
 
                 switch (*p) {
                 case ' ':
@@ -672,6 +693,7 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
                 req->query.str = pos;
                 req->query.len = p-pos;
                 r->parse_state = PS_VERSION_BF;
+                break;
             }
             return_error(HTTP_400);
             break;
@@ -787,7 +809,24 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
         }
     }
 
-    r->parse_pos = end+1;
-    return YHTTP_AGAIN;
+r->parse_pos = end+1;
+return YHTTP_AGAIN;
 }
 
+extern int http_parse_init()
+{
+    ENV.hdr_fields = hash_create(20, NULL, NULL);
+    if (!ENV.hdr_fields)
+        return YHTTP_ERROR;
+    for (size_t i = 0; i < ARRSIZE(hdr_keys); i++) {
+        intptr_t id = hdr_keys[i].id;
+        hash_add(ENV.hdr_fields, hdr_keys[i].key.str, hdr_keys[i].key.len, (void*)id);
+        BUG_ON((void*)id != hash_getk(ENV.hdr_fields, hdr_keys[i].key.str, hdr_keys[i].key.len));
+    }
+    return YHTTP_OK;
+}
+
+extern void http_parse_destroy()
+{
+    hash_destroy(&ENV.hdr_fields);
+}

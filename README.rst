@@ -1,3 +1,4 @@
+======
 yhttpd
 ======
 
@@ -16,13 +17,21 @@ The default structure of ``www`` directory is shown as below.
 
   www/
   |-- err-codes/
-  |   +-- 404.html    # etc. MUST
+  |   +-- 404.html    # etc.
+  |-- cgi-bin/
+  |   +-- dopost.lua
   |
   +-- index.html      # normal file
 
-
-THANKS
+Thanks
 ------
 
-Inspire by ``Tiny-httpd`` *J. David Blackstone*.
+1. Inspire by ``Tiny-httpd`` *J. David Blackstone*.
+#. ``lighttpd``
+#. ``boa server``
+
+Special Thanks
+--------------
+
+1. ``Nginx`` The most desgin is from it
 
