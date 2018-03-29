@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <string.h>
 
+#include <sched.h>
 #include <fcntl.h>
 
 #include "log.h"
@@ -25,3 +26,43 @@ extern void string_tolower(char *str, size_t len)
     for (char *end = str+len; str < end; str++)
         *str = tolower(*str);
 }
+
+extern void set_cpu_affinity(int cpuid)
+{
+    int s;
+    cpuid %= CPU_ID_MAX;
+    cpu_set_t set;
+
+    CPU_ZERO(&set);
+    CPU_SET(cpuid, &set);
+
+    s = sched_setaffinity(0, sizeof(set), &set);
+    if (0 == s)
+        yhttp_debug("Process %d bind to CPU %d#\n", getpid(), cpuid);
+    else
+        yhttp_debug("Process %d bind to CPU %d#, FAILE\n", getpid(), cpuid);
+}
+
+#ifdef YHTTP_DEBUG
+# include <execinfo.h>
+#define YHTTP_DEBUG_BACKTRACE_MAX   30
+extern void bug_on(void)
+{
+    void *arr[YHTTP_DEBUG_BACKTRACE_MAX];
+    size_t size;
+    char **strings;
+    size_t i;
+
+    size = backtrace(arr, 10);
+    strings = backtrace_symbols(arr, size);
+
+    printf("Obtained %zd stack frames.\n", size);
+
+    for (size_t i = 0; i < size; i++)
+        printf("%s\n", strings[i]);
+
+    free(strings);
+
+    exit(-1);
+}
+#endif

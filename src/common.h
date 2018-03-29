@@ -9,8 +9,9 @@
 
 #define BUFF_SIZE           (2048)
 #define ACCEPT_LOCK         ("yhttp-"VER".lock")
-#define TIMEOUT_CFG         (10*1000)       /* 10 s */
+#define TIMEOUT_CFG         (5*1000)        /* 5 s */
 #define TIME_INTERVAL_CFG   (1*1000)        /* 1 s */
+#define CPU_ID_MAX          (2)
 
 #define MAX(x, y)       ((x)>(y)? (x): (y))
 #define MIN(x, y)       ((x)<(y)? (x): (y))
@@ -18,9 +19,10 @@
 #define SSTR_LEN(str)   (sizeof(str)-1)
 
 #define YHTTP_OK     (0)
-#define YHTTP_ERROR  (-1)
+#define YHTTP_AGAIN  (-1)
 #define YHTTP_BLOCK  (-2)
-#define YHTTP_AGAIN  (-3)
+#define YHTTP_FAILE  (-3)
+#define YHTTP_ERROR  (-4)
 
 typedef intptr_t msec_t;
 
@@ -32,6 +34,7 @@ typedef struct string_t {
         && !strncmp((s1)->str, (s2)->str, (s1)->len))
 #define string_newstr(str)      {(str), SSTR_LEN(str)}
 #define string_null             {NULL, 0}
+#define string_isnull(s)        ((s)->str == NULL && (s)->len == 0)
 extern void string_tolower(char *str, size_t len);
 
 typedef struct str_pairt_t {
@@ -42,8 +45,8 @@ typedef struct str_pairt_t {
 ssize_t write_s(int fd, uint8_t const *buff, ssize_t n);
 ssize_t read_s(int fd, uint8_t *buff, ssize_t n);
 
-void *memfind(void const *mem, ssize_t memlen, void const *pat, ssize_t patlen);
-
+extern void *memfind(void const *mem, ssize_t memlen, void const *pat, ssize_t patlen);
+extern void set_cpu_affinity(int cpuid);
 extern void set_nonblock(int fd);
 
 #ifndef offsetof
@@ -56,9 +59,11 @@ extern void set_nonblock(int fd);
 #endif
 
 #ifdef YHTTP_DEBUG
+void bug_on(void);
 # define BUG_ON(exp)    do { \
     if (exp) { \
         printf("BUG ON %s:%d(%s) %s\n", __FILE__, __LINE__, __FUNCTION__, #exp); \
+        bug_on(); \
     } \
 } while (0)
 #else

@@ -17,7 +17,8 @@ int sfd;
 
 int main(int argc, char **argv)
 {
-    //yhttp_log_set(LOG_DEBUG2);
+    if (argc > 1 && !strncmp("-d", argv[1], 2))
+        yhttp_log_set(LOG_DEBUG2);
     sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (-1 == sfd) {
         perror("socket");
@@ -55,7 +56,8 @@ int main(int argc, char **argv)
         goto err;
     }
 
-    run_worker(1, sfd);
+    set_cpu_affinity(0);
+    run_worker(0, sfd);
 
 err:
     sem_close(sem);

@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
 
 #include "../src/log.h"
 #include "../src/http.h"
@@ -129,6 +130,8 @@ static void test_http_head3(void)
                     "Accept: text/html"CRLF
                     "Accept-Encoding: gzip, deflate"CRLF
                     "Accept-Language: zh-CN"CRLF
+                    "If-None-Match: a2a04f8ee4e538cf"CRLF
+                    "Range: bytes=10-200"CRLF
                     CRLF;
     http_parse_init();
     http_request_t *req = http_request_malloc();
@@ -142,6 +145,9 @@ static void test_http_head3(void)
     assert(req->com.connection);
     assert(HTTP_PRAGMA_NO_CACHE == req->com.pragma);
     assert((HTTP_GZIP|HTTP_DEFLATE|HTTP_IDENTITY) == req->req.accept_encoding);
+    assert(0 == strncmp("a2a04f8ee4e538cf", req->req.if_none_match.str, req->req.if_none_match.len));
+    assert(10 == req->req.range1);
+    assert(200 == req->req.range2);
 
     http_request_free(req);
     http_parse_destroy();

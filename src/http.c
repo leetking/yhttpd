@@ -17,9 +17,13 @@ extern int http_init()
         goto error_page_err;
     if (YHTTP_OK != http_parse_init())
         goto parse_init_err;
+    if (YHTTP_OK != http_mime_init())
+        goto mime_init_err;
 
     return YHTTP_OK;
 
+mime_init_err:
+    http_parse_destroy();
 parse_init_err:
     http_error_page_destroy();
 error_page_err:
@@ -34,8 +38,16 @@ extern void http_destroy()
 
 extern void http_request_reuse(http_request_t *req)
 {
+    buffer_init(req->request_head);
+    buffer_init(req->response_buffer);
     req->parse_pos = req->request_head->pos;
     req->parse_state = HTTP_PARSE_INIT;
+    req->req.if_modified_since = 0;
+    req->req.range1 = 0;
+    req->req.range2 = INT_MAX;          /* indicate infinity */
+
+    req->req.if_none_match.str = NULL;
+    req->req.if_none_match.len = 0;
 }
 
 extern http_request_t *http_request_malloc()
@@ -83,16 +95,24 @@ extern int http_check_request(http_request_t *r)
 
     /* NOTE http/1.0 dont support media type and isn't Host */
     if (HTTP10 == com->version) {
-        com->transfer_encoding  = HTTP_UNCHUNKED;
+        unsigned int support_method = HTTP_GET|HTTP_HEAD;
+        if (!(support_method & req->method)) {
+            res->code = HTTP_405;
+            return YHTTP_ERROR;
+        }
+        return YHTTP_OK;
     }
-
-    com->content_encoding = HTTP_IDENTITY;
 
     if (HTTP11 == com->version) {
-        com->transfer_encoding  = HTTP_CHUNKED;
+        unsigned int support_method = HTTP_GET|HTTP_HEAD;
+        if (!(support_method & req->method)) {
+            res->code = HTTP_405;
+            return YHTTP_ERROR;
+        }
+        return YHTTP_OK;
     }
 
-    return YHTTP_OK;
+    return YHTTP_ERROR;
 }
 
 extern int http_build_response_head(http_request_t *r)
@@ -182,9 +202,44 @@ extern int http_build_response_head(http_request_t *r)
             len = snprintf(resb->last, buffer_rest(resb), "Connection: Close"CRLF);
         }
         resb->last += len;
+
+        /* Cache Control */
+        switch (com->cache_control) {
+        case HTTP_CACHE_CONTROL_PUBLIC:
+            len = snprintf(resb->last, buffer_rest(resb), "Cache-Control: public"CRLF);
+            break;
+        case HTTP_CACHE_CONTROL_NO_CACHE:
+            len = snprintf(resb->last, buffer_rest(resb), "Cache-Control: no-cache, max-age=%d"CRLF,
+                    com->cache_control_max_age);
+            break;
+        case HTTP_CACHE_CONTROL_NO_STORE:
+            len = snprintf(resb->last, buffer_rest(resb), "Cache-Control: no-store"CRLF);
+            break;
+        case HTTP_CACHE_CONTROL_PRIVATE:
+        default:
+            len = 0;
+            break;
+        }
+        resb->last += len;
+
+        /* append Etag */
+        if (res->etag[0] != '\0') {
+            len = snprintf(resb->last, buffer_rest(resb), "Etag: %.*s"CRLF, HTTP_ETAG_LEN, res->etag);
+            resb->last += len;
+        }
+
+        switch (res->code) {
+        case HTTP_206:
+            len = snprintf(resb->last, buffer_rest(resb), "Content-Range: bytes %d-%d/%d"CRLF,
+                    com->content_range1, com->content_range2, com->file_size);
+            resb->last += len;
+            break;
+        }
     }
 
-    if (res->code == HTTP_200) {
+    switch (res->code) {
+    case HTTP_200:
+    case HTTP_206:
         /* Last Modified */
         gmt = gmtime(&com->last_modified);
         len = snprintf(resb->last, buffer_rest(resb), "Last-Modified: %s, %02d %s %4d %02d:%02d:%02d GMT"CRLF,
@@ -192,18 +247,125 @@ extern int http_build_response_head(http_request_t *r)
                 months[gmt->tm_mon - 1], gmt->tm_year+1900,
                 gmt->tm_hour, gmt->tm_min, gmt->tm_sec);
         resb->last += len;
-    }
-
-    /* Location 3xx */
-    if (res->code/100 == 3) {
-        len = snprintf(resb->last, buffer_rest(resb), "Location: %.*s"CRLF,
-                res->location.len, res->location.str);
-        resb->last += len;
+        break;
+    case HTTP_301:
+    case HTTP_304:
+        /* Location 301 */
+        if (res->code == 301) {
+            len = snprintf(resb->last, buffer_rest(resb), "Location: %.*s"CRLF,
+                    res->location.len, res->location.str);
+            resb->last += len;
+        }
+        break;
     }
 
     *resb->last++ = CR;
     *resb->last++ = LF;
-    yhttp_debug2("response header\n%s\n", resb->pos, buffer_len(resb));
+    yhttp_debug2("response header %d:%d\n%.*s\n",
+            buffer_len(resb), buffer_rest(resb), buffer_len(resb), resb->pos);
 
     return 0;
 }
+
+extern http_dispatcher_t http_dispatch(http_request_t *r)
+{
+    struct http_head_req const *req = &r->req;
+    struct http_head_com *com = &r->com;
+    struct http_head_res *res = &r->res;
+    http_file_t const *file = &r->backend.file;
+
+    if (!(file->stat.st_mode&S_IFREG)
+            || !(file->stat.st_mode&(S_IRUSR|S_IRGRP))) {
+        res->code = HTTP_403;
+        return HTTP_DISPATCHER(req->method, HTTP_403);
+    }
+
+    com->file_size = file->stat.st_size;
+
+    com->content_encoding = HTTP_IDENTITY;
+    com->content_length = file->stat.st_size;
+    com->last_modified = file->stat.st_ctim.tv_sec;
+    com->pragma = HTTP_PRAGMA_UNSET;
+    com->content_type = http_mime_get(req->suffix.str, req->suffix.len);
+    com->transfer_encoding = HTTP_UNCHUNKED;
+    r->pos = 0;
+    r->last = com->content_length;
+
+    if (HTTP11 == com->version) {
+        int etag_n;
+        com->cache_control = HTTP_CACHE_CONTROL_NO_CACHE;
+        com->cache_control_max_age = HTTP_CACHE_MAX_AGE;
+
+        etag_n = HTTP_ETAG_LEN;
+        http_generate_etag(&req->uri, file->stat.st_ctim.tv_nsec, file->stat.st_size,
+                res->etag, &etag_n);
+        if (!string_isnull(&req->if_none_match)
+                && !strncmp(req->if_none_match.str, res->etag, HTTP_ETAG_LEN)) {
+            res->code = HTTP_304;
+            return HTTP_DISPATCHER(req->method, HTTP_304);
+        }
+
+        /* Range, 206 Partial Content */
+        if (req->range1 != 0 || req->range2 != INT_MAX) {
+            r->pos = (req->range1 < 0)? r->last+req->range1: req->range1;
+            if (req->range2 < INT_MAX)
+                r->last = req->range2+1;
+            if (r->pos < 0 || r->last > file->stat.st_size) {
+                res->code = HTTP_416;
+                return HTTP_DISPATCHER(req->method, HTTP_416);
+            } else if (r->pos > 0 || r->last < file->stat.st_size) {
+                com->content_range1 = r->pos;
+                com->content_range2 = r->last-1;
+                com->content_length = r->last - r->pos;
+                res->code = HTTP_206;
+                return HTTP_DISPATCHER(req->method, HTTP_206);
+            }
+            /* start-end indicates all file */
+        }
+    }
+
+    if ((int)difftime(req->if_modified_since, file->stat.st_ctim.tv_sec) > 0) {
+        res->code = HTTP_304;
+        return HTTP_DISPATCHER(req->method, HTTP_304);
+    }
+
+    res->code = HTTP_200;
+    return HTTP_DISPATCHER(req->method, HTTP_200);
+}
+
+extern void http_generate_etag(string_t const *url, time_t ctime, size_t size,
+        char *out, int *out_n)
+{
+#define HTTP_ETAG_HALFLEN   (HTTP_ETAG_LEN/2)
+    unsigned char etag[HTTP_ETAG_HALFLEN] = "";
+    if (*out_n < HTTP_ETAG_LEN) {
+        *out_n = -1;
+        return;
+    }
+    *out_n = HTTP_ETAG_LEN;
+    uint64_t h = 0;
+    for (int i = 0; i < url->len; i++)
+        h = 31*h+ url->str[i];
+
+#define hash_digit(h, d) do { \
+    char const *p = (char const *)&d; \
+    for (size_t i = 0; i < sizeof(d); i++) \
+    h = 31*h+p[i]; \
+} while (0)
+
+#define xor_string(d) do { \
+    char const *p = (char const *)&d; \
+    for (int i = 0; i < HTTP_ETAG_HALFLEN; i++) \
+    etag[i] ^= p[i%sizeof(d)]; \
+} while (0)
+
+    hash_digit(h, ctime);
+    hash_digit(h, size);
+    xor_string(h);
+
+#undef hash_digit
+#undef xor_digit
+    for (int i = 0; i < HTTP_ETAG_HALFLEN; i++)
+    sprintf(out+2*i, "%02x", etag[i]);
+}
+

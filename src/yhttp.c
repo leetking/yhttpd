@@ -154,12 +154,12 @@ int main(int argc, char **argv)
         goto sfd_err;
     }
 
-    /* TODO bind work process to cpu */
     /* fork and run the worker */
     for (int i = 0; i < WORKS; i++) {
         pid_t pid = fork();
         switch (pid) {
         case 0: /* child */
+            set_cpu_affinity(i);
             exit(run_worker(i, sfd));
             break;
         case -1:
@@ -199,6 +199,7 @@ int main(int argc, char **argv)
         if (!quit) {
             pid_t neopid = fork();
             if (0 == neopid) {
+                set_cpu_affinity(id);
                 exit(run_worker(id, sfd));
 
             } else if (-1 == neopid) {

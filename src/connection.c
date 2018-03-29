@@ -16,6 +16,8 @@ extern void connection_free(connection_t *c)
 
 extern ssize_t connection_read(int fd, char *start, char *end)
 {
+    if (start >= end)
+        return YHTTP_BLOCK;
     int rdn = read(fd, start, end-start);
     if (rdn > 0)
         return rdn;
@@ -28,6 +30,8 @@ extern ssize_t connection_read(int fd, char *start, char *end)
 
 extern ssize_t connection_write(int fd, char const *start, char const *end)
 {
+    if (start >= end)
+        return YHTTP_BLOCK;
     int wrn = write(fd, start, end-start);
     if (wrn > 0)
         return wrn;

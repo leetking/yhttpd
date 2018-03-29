@@ -269,8 +269,8 @@ static int http_parse_range(http_request_t *r, char const *start, char const *en
         return YHTTP_ERROR;
     }
     if (isdigit(*start)) {
-        return (2 == sscanf(start, "%d-%d", &r->req.range1, &r->req.range2))?
-            YHTTP_AGAIN: YHTTP_ERROR;
+        int n = sscanf(start, "%d-%d", &r->req.range1, &r->req.range2);
+        return (0 == n)? YHTTP_ERROR: YHTTP_AGAIN;
     }
     return YHTTP_ERROR;
 }
@@ -297,8 +297,6 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
     yhttp_debug2("value: %.*s\n", len, start);
     switch (r->hdr_type) {
     case HDR_CACHE_CONTROL:
-        com->cache_control.str = start;
-        com->cache_control.len = len;
         break;
     case HDR_CONNECTION:
         com->connection = (0 != strncasecmp("close", start, 5));
@@ -371,6 +369,9 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
         return http_parse_time_gmt(&req->if_modified_since, start, end);
         break;
     case HDR_IF_NONE_MATCH:
+        /* Parse Etag */
+        req->if_none_match.str = start;
+        req->if_none_match.len = len;
         break;
     case HDR_IF_RANGE:
         break;
@@ -404,7 +405,7 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
     case HDR_ORIGIN:
         break;
     default:
-        BUG_ON("http parsing header field unkown type\n");
+        BUG_ON("http parsing header field unkown type");
         return YHTTP_ERROR;
     }
     return YHTTP_AGAIN;
@@ -744,7 +745,6 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
                 break;
             if (':' == *p) {
                 int s = http_parse_key_of_hdr(r, pos, p);
-                /* FIXME return value of http_parse_key_of_hdr */
                 if (YHTTP_ERROR == s)
                     return_error(HTTP_400);
                 r->parse_state = PS_HEADER_VALUE_BF;
@@ -769,7 +769,6 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
                 break;
             if (CR == *p) {
                 int s = http_parse_value_of_hdr(r, pos, p);
-                /* FIXME return value of http_parse_value_of_hdr */
                 if (YHTTP_ERROR == s)
                     return_error(HTTP_400);
                 r->parse_state = PS_ALMOST_END;
@@ -804,13 +803,13 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
             break;
 
         default:
-            BUG_ON("http parsing unkown state\n");
+            BUG_ON("http parsing unkown state");
             break;
         }
     }
 
-r->parse_pos = end+1;
-return YHTTP_AGAIN;
+    r->parse_pos = end;
+    return YHTTP_AGAIN;
 }
 
 extern int http_parse_init()

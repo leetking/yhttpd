@@ -7,17 +7,19 @@
 http_error_page_t pages[] = {
     {HTTP_200, "200", string_newstr("200 OK"), },
     {HTTP_202, "202", string_newstr("202 Accept"), },
+    {HTTP_206, "206", string_newstr("206 Partial Content"), },
 
     {HTTP_301, "301", string_newstr("301 OK"), },
+    {HTTP_304, "304", string_newstr("304 Not Modified"), },
 
     {HTTP_400, "400", string_newstr("400 Bad Request"), },
     {HTTP_403, "403", string_newstr("403 Forbidden"), },
     {HTTP_404, "404", string_newstr("404 Not Found"), },
-    {HTTP_405, "405", string_newstr("405 Method Not Allowed"), },
+    {HTTP_405, "405", string_newstr("405 Method Not Allowed"), },       /* HTTP/1.1 */
     {HTTP_413, "413", string_newstr("413 Request Entity Too Large"), },
     {HTTP_414, "414", string_newstr("414 Request-URI Too Large"), },
     {HTTP_415, "415", string_newstr("415 Unsupported Media Type"), },
-    {HTTP_416, "416", string_newstr("416 Requested range not statisfiable"), },
+    {HTTP_416, "416", string_newstr("416 Requested Range Not Statisfiable"), },
 
     {HTTP_500, "500", string_newstr("500 Internal Server Error"), },
     {HTTP_501, "501", string_newstr("501 Not Implemented"), },
@@ -32,16 +34,16 @@ extern int http_error_page_init(char const *dir)
 {
     char const *tempalte = {
         "<!DOCTYPE html>"
-            "<html lang='en'>"
+        "<html lang='en'>"
             "<head>"
-            "<meta charset='UTF-8'>"
-            "<title>%.*s</title>"
+                "<meta charset='UTF-8'>"
+                "<title>%.*s</title>"
             "</head>"
             "<body>"
-            "<h1>%.*s</h1>"
-            "<p>Server: %.*s</p>"
+                "<h1>%.*s</h1>"
+                "<p>Server: %.*s</p>"
             "</body>"
-            "</html>"
+        "</html>"
     };
 #define HTTP_TEMPLATE_PAGE_SIZE    (256)
 
@@ -78,6 +80,6 @@ extern http_error_page_t const *http_error_page_get(int code)
         if (code == pages[i].code)
             return pages+i;
     }
-    BUG_ON("code is not in the range\n");
+    BUG_ON("code is not in the range");
     return NULL;
 }

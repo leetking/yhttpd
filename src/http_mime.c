@@ -70,6 +70,8 @@ extern void http_mime_destroy()
 
 extern int http_mime_get(char const *suffix, size_t len)
 {
+    if (!suffix || len == 0)
+        return MIME_APPLICATION_OCTET_STREAM;
     intptr_t vlu = (intptr_t)hash_getk(ENV.mimes, suffix, len);
     if ((intptr_t)NULL == vlu || MIME_INVALID == vlu)
         return MIME_APPLICATION_OCTET_STREAM;

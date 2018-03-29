@@ -7,6 +7,10 @@ msec_t current_msec;
 time_t current_sec;
 char current_http_time[HTTP_GMT_TIME_LEN+1];
 
+static char const *WEEK[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+static char const *MONTHS[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
 extern msec_t http_update_time()
 {
     struct timeval tv;

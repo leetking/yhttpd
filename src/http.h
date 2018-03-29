@@ -13,12 +13,16 @@
 #include "http_page.h"
 #include "http_file.h"
 
+#define HTTP_CACHE_MAX_AGE          (120)
+
 #define HTTP_BUFFER_SIZE_CFG        4096
 #define HTTP_LARGE_BUFFER_SIZE_CFG  (2*HTTP_BUFFER_SIZE_CFG)
 
 #define CR     '\r'
 #define LF     '\n'
 #define CRLF   "\r\n"
+
+#define HTTP_ETAG_LEN               (16)
 
 #define HTTP_COOKIE_PAIR_MAX_CFG    12
 
@@ -51,6 +55,11 @@
 #define HTTP_PRAGMA_UNSET       0
 #define HTTP_PRAGMA_NO_CACHE    1
 
+#define HTTP_CACHE_CONTROL_NO_STORE 0x01
+#define HTTP_CACHE_CONTROL_NO_CACHE 0x02
+#define HTTP_CACHE_CONTROL_PUBLIC   0x04
+#define HTTP_CACHE_CONTROL_PRIVATE  0X08
+
 /* language */
 #define HTTP_LANG_CN    0x01
 #define HTTP_LANG_EN    0x02
@@ -64,8 +73,10 @@
 enum {
     HTTP_200 = 200,     /* OK */
     HTTP_202 = 202,     /* Accept */
+    HTTP_206 = 206,     /* Partial Content */
 
     HTTP_301 = 301,     /* Moved Permanently */
+    HTTP_304 = 304,     /* Not Modified */
 
     HTTP_400 = 400,     /* Bad Request */
     HTTP_403 = 403,     /* Forbidden */
@@ -82,15 +93,10 @@ enum {
 };
 
 struct http_head_com {
-
-    string_t cache_control;
-    string_t update;
-    string_t via;
-    string_t warning;
-
+    int cache_control_max_age;
+    int file_size;
     int content_length;
     int content_range1, content_range2;
-    string_t content_md5;
 
     time_t expires;
     time_t last_modified;
@@ -98,8 +104,13 @@ struct http_head_com {
 
     string_t str_cookie;
     str_pairt_t cookies[HTTP_COOKIE_PAIR_MAX_CFG];
+    string_t update;
+    string_t via;
+    string_t warning;
+    string_t content_md5;
     uint8_t keep_alive;
 
+    unsigned cache_control:4;
     unsigned version:2;
     unsigned transfer_encoding:1;
     unsigned content_language:3;
@@ -148,7 +159,7 @@ struct http_head_res {
 
     string_t accept_ranges;
     int age;
-    string_t etag;
+    char etag[HTTP_ETAG_LEN+1];
     string_t location;
     string_t proxy_authoricate;
     string_t proxy_after;
@@ -168,7 +179,7 @@ typedef struct http_request_t {
     uint8_t request_head_large:1;
 
     buffer_t *response_buffer;          /* buffer of response */
-    off_t pos, size;
+    off_t pos, last;
     union {
         http_file_t file;
         http_page_t const *page;        /* cache page or error page */
@@ -189,5 +200,13 @@ extern int http_check_request(http_request_t *req);
 extern int http_build_response_head(http_request_t *req);
 extern void http_init_error_page(event_t *ev);
 extern void http_init_response(event_t *ev);
+extern void http_generate_etag(string_t const *url, time_t ctime, size_t size,
+        char *out, int *out_n);
+
+typedef uint64_t http_dispatcher_t;
+extern http_dispatcher_t http_dispatch(http_request_t *r);
+#define HTTP_DISPATCHER(method, code)   (((code)<<10)|(method))
+#define HTTP_DISPATCHER_METHOD(dp)      ((dp)&0x03ff)
+#define HTTP_DISPATCHER_CODE(dp)        (((dp)&0x03ff)>>10)
 
 #endif /* HTTP_H__ */

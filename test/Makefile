@@ -1,12 +1,12 @@
 CC := gcc
 VER := test
 
-SANITIZE :=
-SANITIZE := -fsanitize=address
+CFLAGS_DEBUG  := -O0 -DYHTTP_DEBUG -fsanitize=address
+LDFLAGS_DEBUG := -fsanitize=address -rdynamic
 
-CFLAGS  := -g -Wall -Wno-format-truncation -Wno-unused -O0 -MMD -MP -DVER=\"$(VER)\" \
-	-DYHTTP_DEBUG $(SANITIZE)
-LDFLAGS := -lpthread $(SANITIZE)
+CFLAGS  := -D_GNU_SOURCE -g -Wall -Wno-format-truncation -Wno-unused -MMD -MP -DVER=\"$(VER)\" \
+	$(CFLAGS_DEBUG)
+LDFLAGS := -lpthread $(LDFLAGS_DEBUG)
 
 SRCS := $(filter-out ../src/yhttp.c, $(wildcard ../src/*.c))
 OBJS := $(SRCS:.c=.c.o)

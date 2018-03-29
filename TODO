@@ -1,10 +1,12 @@
-* 改进请求分发
+* 解析 cookie 31 号
+* 实现 poll 和 epoll 30 号一天
 * 整理事件处理逻辑
 
-* url pattern 采用 lua 的匹配方法
-
-* 回应如何设计，内存缓冲，文件读，FastCGI 接口
+* 采用 LRU 结构，分块缓存
+* FastCGI 接口
 * 如何设计配置文件，并且提供一个无需配置文件的运行
+
+* 对 URL 做安全的检查,比如 ../../
 
 * optimize performance from allocing memory by pool
 * 负载均衡
@@ -14,8 +16,9 @@
 * 为读套接字设计读低水位，减少不必要的唤醒
 * 改进锁的实现
 * 对于 force 请求性能不正常
-* http_parse_request_head 可以优化
-
+* 多工作进程会崩溃
+* 虚拟内存占用过高 20T
+* _GNU_SOURCE 在文件内指定无效
 
 * HTTP/0.9 如何工作
   不保持链接，无法协商内容，不返回媒体类型
@@ -35,6 +38,13 @@ Ref: https://zhuanlan.zhihu.com/p/23366045
   2. 状态管理 101, 203, 205 等
   3. Cache
 
++ 实现 HTTP/1.0 的特征
+* 实现 HTTP/1.1 的部分特征
++ Range 属于 HTTP/1.1，已经实现
++ Etag 和 If-None-Match 和 Cache-Control
++ 支持 If-Modified-Since 和 304
++ 支持 LINK UNLINK 等正确响应 Not Implement 并且 POST 405 Method Not Allowed (http/1.1)
++ 绑定 CPU 提高了 200000 pages/min，但是多工作进程没有提高多少效率
 + Trailer 允许在回应后部添加额外的 Header Field
 + linux 下 semaphore 文件存储于 /dev/shm/sem.xxx
 + 考虑超时节点的插入，来确定选取什么结构
