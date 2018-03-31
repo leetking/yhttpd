@@ -13,4 +13,9 @@ extern void event_respond_page(event_t *ev);
 extern void event_read_file(event_t *ev);
 extern void event_send_file(event_t *ev);
 
+extern void event_read_request_body(event_t *ev);
+extern void event_send_to_fcgi(event_t *ev);
+extern void event_read_fcgi(event_t *ev);
+extern void event_send_to_client(event_t *ev);
+
 #endif

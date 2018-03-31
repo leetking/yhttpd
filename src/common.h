@@ -8,9 +8,6 @@
 #include <unistd.h>
 
 #define BUFF_SIZE           (2048)
-#define ACCEPT_LOCK         ("yhttp-"VER".lock")
-#define TIMEOUT_CFG         (5*1000)        /* 5 s */
-#define TIME_INTERVAL_CFG   (1*1000)        /* 1 s */
 #define CPU_ID_MAX          (2)
 
 #define MAX(x, y)       ((x)>(y)? (x): (y))

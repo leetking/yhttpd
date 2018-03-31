@@ -52,12 +52,12 @@ extern int event_process_posted(list_t *queue)
     return 0;
 }
 
-/* TODO Finish process_all_events(), consider the timer */
 extern void process_all_events()
 {
     msec_t timer = event_min_timer();
 
     event_process(timer);
+    /* TODO Finish process_all_events(), consider the timer and return value */
 
     http_update_time();
 

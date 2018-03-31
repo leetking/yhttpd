@@ -6,11 +6,156 @@
 
 extern connection_t *connection_malloc()
 {
-    return yhttp_malloc(sizeof(connection_t));
+    connection_t *c = yhttp_malloc(sizeof(connection_t));
+    if (!c) return NULL;
+
+    return c;
 }
 
 extern void connection_free(connection_t *c)
 {
+    BUG_ON(NULL == c);
+
+    if (c->rd || c->wr)
+        event_free(c->ev);
+    yhttp_free(c);
+}
+
+extern void connection_pause(connection_t *c, int event)
+{
+    int s = 0;
+    BUG_ON(NULL == c);
+    switch (event) {
+    case EVENT_READ:
+        BUG_ON(!c->rd);
+        BUG_ON(!c->rd_enable);
+        c->rd_enable = 0;
+        s = event_del(c->ev, EVENT_READ);
+        if (c->ev->timeout_set)
+            event_del_timer(c->ev);
+        break;
+    case EVENT_WRITE:
+        BUG_ON(!c->wr);
+        BUG_ON(!c->wr_enable);
+        c->wr_enable = 0;
+        s = event_del(c->ev, EVENT_WRITE);
+        break;
+    default:
+        BUG_ON("unkown event type");
+        break;
+    }
+    BUG_ON(s != 0);
+}
+
+extern void connection_revert(connection_t *c, int event)
+{
+    int s = 0;
+    BUG_ON(NULL == c);
+    switch (event) {
+    case EVENT_READ:
+        BUG_ON(!c->rd);
+        BUG_ON(c->rd_enable);
+        c->rd_enable = 1;
+        s = event_add(c->ev, EVENT_READ);
+        break;
+    case EVENT_WRITE:
+        BUG_ON(!c->wr);
+        BUG_ON(c->wr_enable);
+        c->wr_enable = 1;
+        s = event_add(c->ev, EVENT_WRITE);
+        break;
+    default:
+        BUG_ON("unkown event type");
+        break;
+    }
+    BUG_ON(s != 0);
+}
+
+extern void connection_event_add(connection_t *c, int event, event_t *ev)
+{
+    int s = 0;
+    BUG_ON(NULL == c);
+    switch (event) {
+    case EVENT_READ:
+        BUG_ON(c->rd);
+        BUG_ON(c->rd_enable);
+        c->rd = 1;
+        c->rd_enable = 1;
+        c->ev = ev;
+        s = event_add(c->ev, EVENT_READ);
+        break;
+    case EVENT_WRITE:
+        BUG_ON(c->wr);
+        BUG_ON(c->wr_enable);
+        c->wr = 1;
+        c->wr_enable = 1;
+        c->ev = ev;
+        s = event_add(c->ev, EVENT_WRITE);
+        break;
+    default:
+        BUG_ON("unkown event type");
+        break;
+    }
+    BUG_ON(s != 0);
+}
+
+extern event_t *connection_event_del(connection_t *c, int event)
+{
+    int s = 0;
+    BUG_ON(NULL == c);
+    switch (event) {
+    case EVENT_READ:
+        BUG_ON(!c->rd);
+        c->rd = 0;
+        c->rd_enable = 0;
+        s = event_del(c->ev, EVENT_READ);
+        if (c->ev->timeout_set)
+            event_del_timer(c->ev);
+        break;
+    case EVENT_WRITE:
+        BUG_ON(!c->wr);
+        c->wr = 0;
+        c->wr_enable = 0;
+        s = event_del(c->ev, EVENT_WRITE);
+        break;
+    default:
+        BUG_ON("unkown event type");
+        break;
+    }
+    BUG_ON(s != 0);
+    return c->ev;
+}
+
+extern void connection_read_timeout(connection_t *c, msec_t ts)
+{
+    event_t *ev = c->ev;
+    BUG_ON(!c->rd);
+    BUG_ON(!ev->read);
+
+    c->tmstamp = ts;
+    if (ev->timeout_set)
+        event_del_timer(ev);
+    event_add_timer(ev);
+}
+
+extern void connection_destroy(connection_t *c)
+{
+    int nedd_free = 0;
+
+    BUG_ON(NULL == c);
+
+    if (c->rd) {
+        if (c->ev->timeout_set)
+            event_del_timer(c->ev);
+        event_del(c->ev, EVENT_READ);
+        nedd_free = 1;
+    } else if (c->wr) {
+        event_del(c->ev, EVENT_WRITE);
+        nedd_free = 1;
+    }
+    if (nedd_free)
+        event_free(c->ev);
+    close(c->fd);
     yhttp_free(c);
 }
 

@@ -11,14 +11,18 @@
 #include "../src/worker.h"
 #include "../src/common.h"
 #include "../src/log.h"
+#include "../src/setting.h"
 
 sem_t *sem;
 int sfd;
 
 int main(int argc, char **argv)
 {
-    if (argc > 1 && !strncmp("-d", argv[1], 2))
+    if (argc > 1 && !strncmp("-v", argv[1], 2))
         yhttp_log_set(LOG_DEBUG2);
+
+    setting_init_default(&SETTING);
+
     sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (-1 == sfd) {
         perror("socket");
@@ -63,6 +67,7 @@ err:
     sem_close(sem);
     sem_unlink(ACCEPT_LOCK);
     close(sfd);
+    setting_destroy(&SETTING);
     
     printf("test-worker exit normal\n");
     exit(0);

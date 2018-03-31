@@ -4,7 +4,6 @@
 #include <time.h>
 #include "common.h"
 
-
 #define HTTP_SNEDFILE_MAXSIZE_CFG    (1024)
 #define HTTP_PAGE_SIZE_CFG           (4*1024)
 #define HTTP_LARGE_PAGE_SIZE_CFG     (16*1024)

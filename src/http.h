@@ -12,19 +12,14 @@
 #include "connection.h"
 #include "http_page.h"
 #include "http_file.h"
-
-#define HTTP_CACHE_MAX_AGE          (120)
-
-#define HTTP_BUFFER_SIZE_CFG        4096
-#define HTTP_LARGE_BUFFER_SIZE_CFG  (2*HTTP_BUFFER_SIZE_CFG)
+#include "setting.h"
+#include "fastcgi.h"
 
 #define CR     '\r'
 #define LF     '\n'
 #define CRLF   "\r\n"
 
 #define HTTP_ETAG_LEN               (16)
-
-#define HTTP_COOKIE_PAIR_MAX_CFG    12
 
 #define HTTP_GET     0x001  /* HTTP/1.0 */
 #define HTTP_POST    0x002  /* HTTP/1.0 */
@@ -102,8 +97,6 @@ struct http_head_com {
     time_t last_modified;
     time_t date;
 
-    string_t str_cookie;
-    str_pairt_t cookies[HTTP_COOKIE_PAIR_MAX_CFG];
     string_t update;
     string_t via;
     string_t warning;
@@ -122,19 +115,13 @@ struct http_head_com {
     unsigned content_type:10;       /* mime */
 };
 
-/* TODO optimize structure http_head_req */
 struct http_head_req {
-    unsigned method:10;
-    uint16_t port;
     string_t uri;
     string_t uri_params;
     string_t suffix;
     string_t query;
 
-    unsigned accept:2;
     string_t accept_charset;
-    unsigned accept_encoding:4; /* content_encoding */
-    unsigned accept_language:3;
     string_t authorization;
     string_t expect;
     string_t from;
@@ -144,14 +131,19 @@ struct http_head_req {
     string_t if_range;
     time_t if_unmodified_since;
     int max_forwards;
-    string_t proxy_authorication;
     int range1, range2;
+    string_t proxy_authorication;
     string_t referer;
     string_t te;
     string_t user_agent;
-    string_t cookies;
-
+    string_t cookie;
     string_t origin;
+
+    unsigned method:10;
+    unsigned accept:2;
+    unsigned accept_encoding:4; /* content_encoding */
+    unsigned accept_language:3;
+    uint16_t port;
 };
 
 struct http_head_res {
@@ -166,40 +158,50 @@ struct http_head_res {
     /* string_t server; */
     string_t vary;
     string_t www_authenticate;
+    string_t set_cookie;    /* TODO set_cookie may be not only one field */
 };
 
 /* a request struct */
 typedef struct http_request_t {
-    struct http_head_com com;           /* the common portion of head */
-    struct http_head_req req;           /* the rest head of requst */
-    struct http_head_res res;           /* the rest head of response */
+    struct http_head_com hdr_com;           /* the common portion of head */
+    struct http_head_req hdr_req;           /* the rest head of requst */
+    struct http_head_res hdr_res;           /* the rest head of response */
 
-    buffer_t *request_head;
-    buffer_t *request_body;
-    uint8_t request_head_large:1;
-
-    buffer_t *response_buffer;          /* buffer of response */
+    buffer_t *hdr_buffer;
+    buffer_t *bdy_buffer;
+    buffer_t *res_buffer;                   /* buffer of response */
     off_t pos, last;
+
     union {
         http_file_t file;
         http_page_t const *page;        /* cache page or error page */
+        http_fastcgi_t fcgi;
     } backend;
 
     char *parse_pos;                    /* current position at the buffer */
     int parse_state;                    /* state of parsing */
     uint8_t hdr_type;
+    uint8_t hdr_buffer_large:1;
+#define HTTP_REQUEST_BACKEND_FILE   0x01
+#define HTTP_REQUEST_BACKEND_PAGE   0x02
+#define HTTP_REQUEST_BACKEND_FCGI   0x04
+    uint8_t backend_type:3;
 } http_request_t;
 
 extern int http_init();
 extern void http_destroy();
 extern http_request_t *http_request_malloc();
-extern void http_request_free(http_request_t *req);
-extern void http_request_reuse(http_request_t *req);
+extern void http_request_free(http_request_t *r);
+extern void http_request_destroy(http_request_t *r);
+extern void http_request_reuse(http_request_t *r);
+extern void http_request_init(http_request_t *r);
+extern int http_request_extend_hdr_buffer(http_request_t *r);
 
-extern int http_check_request(http_request_t *req);
-extern int http_build_response_head(http_request_t *req);
+extern int http_check_request(http_request_t *r);
+extern int http_build_response_head(http_request_t *r);
 extern void http_init_error_page(event_t *ev);
-extern void http_init_response(event_t *ev);
+extern void http_init_response(event_t *ev, struct setting_static *sta);
+extern void http_fastcgi_respond(event_t *ev, struct setting_fastcgi *fcgi);
 extern void http_generate_etag(string_t const *url, time_t ctime, size_t size,
         char *out, int *out_n);
 

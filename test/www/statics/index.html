@@ -7,11 +7,13 @@
 <body>
   <h1>Hello World!</h1>
 
-  <form action="cgi/post.cgi" method="post">
+  <form action="/post" method="post">
     Name: <input name="name" type="text" /><br />
-    Age: <input name="name" type="text" /><br />
+    Age: <input name="age" type="text" /><br />
     <input type="submit" value="Submit" />
   </form>
+  <p><a href="/hello">FastCGI</a></p>
+  <p><a href="page2.html">Page2</a></p>
   <img src="imgs/test.png" />
 </body>
 </html>

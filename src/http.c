@@ -36,18 +36,27 @@ extern void http_destroy()
     http_parse_destroy();
 }
 
-extern void http_request_reuse(http_request_t *req)
+extern void http_request_init(http_request_t *r)
 {
-    buffer_init(req->request_head);
-    buffer_init(req->response_buffer);
-    req->parse_pos = req->request_head->pos;
-    req->parse_state = HTTP_PARSE_INIT;
-    req->req.if_modified_since = 0;
-    req->req.range1 = 0;
-    req->req.range2 = INT_MAX;          /* indicate infinity */
+    http_request_reuse(r);
+    r->hdr_buffer_large = 0;
+}
 
-    req->req.if_none_match.str = NULL;
-    req->req.if_none_match.len = 0;
+extern void http_request_reuse(http_request_t *r)
+{
+    struct http_head_req *req = &r->hdr_req;
+    struct http_head_com *com = &r->hdr_com;
+    buffer_init(r->hdr_buffer);
+    buffer_init(r->res_buffer);
+    r->parse_pos = r->hdr_buffer->pos;
+    r->parse_state = HTTP_PARSE_INIT;
+    req->if_modified_since = 0;     /* 1970-1-1 00:00:00 */
+    req->range1 = 0;
+    req->range2 = INT_MAX;          /* indicate infinity */
+    req->if_none_match.str = NULL;
+    req->if_none_match.len = 0;
+    com->content_length = 0;
+    com->content_encoding = HTTP_UNCHUNKED;
 }
 
 extern http_request_t *http_request_malloc()
@@ -56,18 +65,18 @@ extern http_request_t *http_request_malloc()
     req = yhttp_malloc(sizeof(*req));
     if (!req)
         return req;
-    req->request_head = buffer_malloc(HTTP_BUFFER_SIZE_CFG);
-    if (!req->request_head)
+    req->hdr_buffer = buffer_malloc(YHTTP_BUFFER_SIZE_CFG);
+    if (!req->hdr_buffer)
         goto req_head_err;
-    req->response_buffer = buffer_malloc(HTTP_BUFFER_SIZE_CFG);
-    if (!req->response_buffer)
+    req->res_buffer = buffer_malloc(YHTTP_BUFFER_SIZE_CFG);
+    if (!req->res_buffer)
         goto req_head_err;
 
     return req;
 
 req_head_err:
-    buffer_free(req->response_buffer);
-    buffer_free(req->request_head);
+    buffer_free(req->res_buffer);
+    buffer_free(req->hdr_buffer);
     yhttp_free(req);
     return NULL;
 }
@@ -76,17 +85,24 @@ extern void http_request_free(http_request_t *req)
 {
     BUG_ON(NULL == req);
 
-    buffer_free(req->request_head);
-    buffer_free(req->response_buffer);
+    buffer_free(req->hdr_buffer);
+    buffer_free(req->res_buffer);
     yhttp_free(req);
+}
+
+extern void http_request_destroy(http_request_t *r)
+{
+    buffer_free(r->hdr_buffer);
+    buffer_free(r->res_buffer);
+    yhttp_free(r);
 }
 
 extern int http_check_request(http_request_t *r)
 {
     /* 304*/
-    struct http_head_com *com = &r->com;
-    struct http_head_req *req = &r->req;
-    struct http_head_res *res = &r->res;
+    struct http_head_com *com = &r->hdr_com;
+    struct http_head_req *req = &r->hdr_req;
+    struct http_head_res *res = &r->hdr_res;
 
     if (HTTP09 == com->version && HTTP_GET != req->method) {
         res->code = HTTP_400;
@@ -120,9 +136,9 @@ extern int http_build_response_head(http_request_t *r)
     static char const *week[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
     static char const *months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-    struct http_head_com *com = &r->com;
-    struct http_head_res *res = &r->res;
-    buffer_t *resb = r->response_buffer;
+    struct http_head_com *com = &r->hdr_com;
+    struct http_head_res *res = &r->hdr_res;
+    buffer_t *resb = r->res_buffer;
     http_error_page_t const *page = http_error_page_get(res->code);
     string_t const *reason = &page->reason;
     int len;
@@ -269,9 +285,9 @@ extern int http_build_response_head(http_request_t *r)
 
 extern http_dispatcher_t http_dispatch(http_request_t *r)
 {
-    struct http_head_req const *req = &r->req;
-    struct http_head_com *com = &r->com;
-    struct http_head_res *res = &r->res;
+    struct http_head_req const *req = &r->hdr_req;
+    struct http_head_com *com = &r->hdr_com;
+    struct http_head_res *res = &r->hdr_res;
     http_file_t const *file = &r->backend.file;
 
     if (!(file->stat.st_mode&S_IFREG)
@@ -294,7 +310,7 @@ extern http_dispatcher_t http_dispatch(http_request_t *r)
     if (HTTP11 == com->version) {
         int etag_n;
         com->cache_control = HTTP_CACHE_CONTROL_NO_CACHE;
-        com->cache_control_max_age = HTTP_CACHE_MAX_AGE;
+        com->cache_control_max_age = YHTTP_CACHE_MAX_AGE_CFG;
 
         etag_n = HTTP_ETAG_LEN;
         http_generate_etag(&req->uri, file->stat.st_ctim.tv_nsec, file->stat.st_size,
@@ -369,3 +385,29 @@ extern void http_generate_etag(string_t const *url, time_t ctime, size_t size,
     sprintf(out+2*i, "%02x", etag[i]);
 }
 
+extern int http_request_extend_hdr_buffer(http_request_t *r)
+{
+    buffer_t *b;
+
+    if (r->hdr_buffer_large) {
+        yhttp_debug2("http request header is too large\n");
+        return YHTTP_FAILE;
+    }
+    b = buffer_malloc(YHTTP_LARGE_BUFFER_SIZE_CFG);
+    if (!b) {
+        yhttp_debug("allocate memory for http_large_buffer error\n");
+        return YHTTP_ERROR;
+    }
+    yhttp_debug("Allocate memory for http_large_buffer\n");
+
+    BUG_ON(NULL == r->parse_pos);
+    BUG_ON(r->parse_pos < r->hdr_buffer->pos);
+
+    r->hdr_buffer_large = 1;
+    buffer_copy(b, r->hdr_buffer);
+    buffer_free(r->hdr_buffer);
+    r->hdr_buffer = b;
+    r->parse_pos = b->pos;
+    /* must REPARSE the header ... */
+    return YHTTP_OK;
+}

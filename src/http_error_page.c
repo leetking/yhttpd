@@ -40,8 +40,9 @@ extern int http_error_page_init(char const *dir)
                 "<title>%.*s</title>"
             "</head>"
             "<body>"
-                "<h1>%.*s</h1>"
-                "<p>Server: %.*s</p>"
+                "<center><h1>%.*s</h1></center>"
+                "<hr />"
+                "<center><p>Server: %.*s</p></center>"
             "</body>"
         "</html>"
     };

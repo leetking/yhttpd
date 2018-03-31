@@ -36,32 +36,34 @@ static void test_http10(void)
                     "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36"CRLF
                     CRLF;
     http_parse_init();
-    http_request_t *req = http_request_malloc();
-    if (!req) {
+    http_request_t *r = http_request_malloc();
+    struct http_head_req *req = &r->hdr_req;
+    struct http_head_com *com = &r->hdr_com;
+    if (!r) {
         printf("http_request_malloc error\n");
         printf("Test http request http/1.0 fail\n");
         return;
     }
-    req->parse_state = HTTP_PARSE_INIT;
-    req->parse_pos = NULL;
+    r->parse_state = HTTP_PARSE_INIT;
+    r->parse_pos = NULL;
 
-    assert(YHTTP_OK == http_parse_request_head(req, reqstr, reqstr+SSTR_LEN(reqstr)));
-    assert(HTTP_GET == req->req.method);
-    assert(0 == strncmp("/url.html", req->req.uri.str, req->req.uri.len));
-    assert(HTTP10 == req->com.version);
-    assert(0 == strncmp("example.com", req->req.host.str, req->req.host.len));
-    assert(8080 == req->req.port);
-    assert(0 == strncmp("leetking@test.com", req->req.from.str, req->req.from.len));
-    assert(t == req->req.if_modified_since);
-    assert(0 == strncmp("http://example.com:8080/referer.html", req->req.referer.str, req->req.referer.len));
+    assert(YHTTP_OK == http_parse_request_head(r, reqstr, reqstr+SSTR_LEN(reqstr)));
+    assert(HTTP_GET == req->method);
+    assert(0 == strncmp("/url.html", req->uri.str, req->uri.len));
+    assert(HTTP10 == com->version);
+    assert(0 == strncmp("example.com", req->host.str, req->host.len));
+    assert(8080 == req->port);
+    assert(0 == strncmp("leetking@test.com", req->from.str, req->from.len));
+    assert(t == req->if_modified_since);
+    assert(0 == strncmp("http://example.com:8080/referer.html", req->referer.str, req->referer.len));
     assert(0 == strncmp("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36",
-                req->req.user_agent.str, req->req.user_agent.len));
-    assert(HTTP_PRAGMA_NO_CACHE == req->com.pragma);
-    assert(0 == strncmp("html", req->req.suffix.str, req->req.suffix.len));
+                req->user_agent.str, req->user_agent.len));
+    assert(HTTP_PRAGMA_NO_CACHE == com->pragma);
+    assert(0 == strncmp("html", req->suffix.str, req->suffix.len));
 
-    assert(!req->com.connection);
+    assert(!com->connection);
 
-    http_request_free(req);
+    http_request_free(r);
     http_parse_destroy();
     printf("Test http request http/1.0 passed\n");
 }
@@ -73,19 +75,22 @@ static void test_http_head1(void)
                     "Host: localhost:8080"CRLF
                     CRLF;
     http_parse_init();
-    http_request_t *req = http_request_malloc();
-    req->parse_state = HTTP_PARSE_INIT;
-    req->parse_pos = NULL;
-    assert(YHTTP_OK == http_parse_request_head(req, reqstr, reqstr+SSTR_LEN(reqstr)));
-    assert(HTTP_200 == req->res.code);
-    assert(HTTP_GET == req->req.method);
-    assert(0 == strncmp("/vim", req->req.uri.str, req->req.uri.len));
-    assert(HTTP11 == req->com.version);
-    assert(0 == strncmp("localhost:8080", req->req.host.str, req->req.host.len));
+    http_request_t *r = http_request_malloc();
+    struct http_head_req *req = &r->hdr_req;
+    struct http_head_com *com = &r->hdr_com;
+    struct http_head_res *res = &r->hdr_res;
+    r->parse_state = HTTP_PARSE_INIT;
+    r->parse_pos = NULL;
+    assert(YHTTP_OK == http_parse_request_head(r, reqstr, reqstr+SSTR_LEN(reqstr)));
+    assert(HTTP_200 == res->code);
+    assert(HTTP_GET == req->method);
+    assert(0 == strncmp("/vim", req->uri.str, req->uri.len));
+    assert(HTTP11 == com->version);
+    assert(0 == strncmp("localhost:8080", req->host.str, req->host.len));
 
-    assert(req->com.connection);
+    assert(com->connection);
 
-    http_request_free(req);
+    http_request_free(r);
     http_parse_destroy();
 
     printf("Test http request 1 passed\n");
@@ -100,19 +105,21 @@ static void test_http_head2(void)
                     CRLF;
     int split = 17;
     http_parse_init();
-    http_request_t *req = http_request_malloc();
-    req->parse_state = HTTP_PARSE_INIT;
-    req->parse_pos = NULL;
+    http_request_t *r = http_request_malloc();
+    struct http_head_req *req = &r->hdr_req;
+    struct http_head_com *com = &r->hdr_com;
+    r->parse_state = HTTP_PARSE_INIT;
+    r->parse_pos = NULL;
 
-    assert(YHTTP_AGAIN == http_parse_request_head(req, reqstr, reqstr+split));
-    assert(YHTTP_OK == http_parse_request_head(req, reqstr+split, reqstr+SSTR_LEN(reqstr)));
-    assert(HTTP_POST == req->req.method);
-    assert(0 == strncmp("/vim", req->req.uri.str, req->req.uri.len));
-    assert(0 == strncmp("localhost", req->req.host.str, req->req.host.len));
+    assert(YHTTP_AGAIN == http_parse_request_head(r, reqstr, reqstr+split));
+    assert(YHTTP_OK == http_parse_request_head(r, reqstr+split, reqstr+SSTR_LEN(reqstr)));
+    assert(HTTP_POST == req->method);
+    assert(0 == strncmp("/vim", req->uri.str, req->uri.len));
+    assert(0 == strncmp("localhost", req->host.str, req->host.len));
 
-    assert(!req->com.connection);
+    assert(!com->connection);
 
-    http_request_free(req);
+    http_request_free(r);
     http_parse_destroy();
     printf("Test http request 2 passed\n");
 }
@@ -121,7 +128,7 @@ static void test_http_head3(void)
 {
     printf("Test http request 3\n");
     char reqstr[] = "GET / HTTP/1.1"CRLF
-                    "Host: 119.23.218.41"CRLF
+                    "Host: 119.23.218.41:8081"CRLF
                     "Connection: keep-alive"CRLF
                     "Pragma: no-cache"CRLF
                     "Cache-Control: no-cache"CRLF
@@ -132,24 +139,31 @@ static void test_http_head3(void)
                     "Accept-Language: zh-CN"CRLF
                     "If-None-Match: a2a04f8ee4e538cf"CRLF
                     "Range: bytes=10-200"CRLF
+                    "Cookie: BAIDUID=31091F69F038261112B77BB72C452A21:FG=1; PSTM=1498448347; BIDUPSID=E7CC85ED5E1FB5D5E1609479932A931F; BD_UPN=123353; sug=0; sugstore=0; ORIGIN=0; bdime=0; BD_HOME=0; H_PS_PSSID=1429_19033_21087_22073"CRLF
                     CRLF;
     http_parse_init();
-    http_request_t *req = http_request_malloc();
-    req->parse_state = HTTP_PARSE_INIT;
-    req->parse_pos = NULL;
+    http_request_t *r = http_request_malloc();
+    struct http_head_req *req = &r->hdr_req;
+    struct http_head_com *com = &r->hdr_com;
+    r->parse_state = HTTP_PARSE_INIT;
+    r->parse_pos = NULL;
 
-    assert(YHTTP_OK == http_parse_request_head(req, reqstr, reqstr+SSTR_LEN(reqstr)));
-    assert(HTTP_GET == req->req.method);
-    assert(0 == strncmp("/", req->req.uri.str, req->req.uri.len));
-    assert(0 == strncmp("119.23.218.41", req->req.host.str, req->req.host.len));
-    assert(req->com.connection);
-    assert(HTTP_PRAGMA_NO_CACHE == req->com.pragma);
-    assert((HTTP_GZIP|HTTP_DEFLATE|HTTP_IDENTITY) == req->req.accept_encoding);
-    assert(0 == strncmp("a2a04f8ee4e538cf", req->req.if_none_match.str, req->req.if_none_match.len));
-    assert(10 == req->req.range1);
-    assert(200 == req->req.range2);
+    assert(YHTTP_OK == http_parse_request_head(r, reqstr, reqstr+SSTR_LEN(reqstr)));
+    assert(HTTP_GET == req->method);
+    assert(0 == strncmp("/", req->uri.str, req->uri.len));
+    assert(0 == strncmp("119.23.218.41", req->host.str, req->host.len));
+    assert(8081 == req->port);
+    assert(com->connection);
+    assert(HTTP_PRAGMA_NO_CACHE == com->pragma);
+    assert((HTTP_GZIP|HTTP_DEFLATE|HTTP_IDENTITY) == req->accept_encoding);
+    assert(0 == strncmp("a2a04f8ee4e538cf", req->if_none_match.str, req->if_none_match.len));
+    assert(10 == req->range1);
+    assert(200 == req->range2);
+    assert(0 == strncmp("BAIDUID=31091F69F038261112B77BB72C452A21:FG=1; PSTM=1498448347;"
+                " BIDUPSID=E7CC85ED5E1FB5D5E1609479932A931F; BD_UPN=123353; sug=0; sugstore=0; ORIGIN=0;"
+                " bdime=0; BD_HOME=0; H_PS_PSSID=1429_19033_21087_22073", req->cookie.str, req->cookie.len));
 
-    http_request_free(req);
+    http_request_free(r);
     http_parse_destroy();
     printf("Test http request 3 passed\n");
 }
@@ -163,15 +177,16 @@ static void test_http_head4(void)
                     "Connection: close"CRLF
                     CRLF;
     http_parse_init();
-    http_request_t *req = http_request_malloc();
-    req->parse_state = HTTP_PARSE_INIT;
-    req->parse_pos = NULL;
+    http_request_t *r = http_request_malloc();
+    struct http_head_req *req = &r->hdr_req;
+    r->parse_state = HTTP_PARSE_INIT;
+    r->parse_pos = NULL;
 
-    assert(YHTTP_OK == http_parse_request_head(req, reqstr, reqstr+SSTR_LEN(reqstr)));
-    assert(0 == strncmp("/foo", req->req.uri.str, req->req.uri.len));
-    assert(0 == strncmp("p1=v1&p2=v2", req->req.query.str, req->req.query.len));
+    assert(YHTTP_OK == http_parse_request_head(r, reqstr, reqstr+SSTR_LEN(reqstr)));
+    assert(0 == strncmp("/foo", req->uri.str, req->uri.len));
+    assert(0 == strncmp("p1=v1&p2=v2", req->query.str, req->query.len));
 
-    http_request_free(req);
+    http_request_free(r);
     http_parse_destroy();
     printf("Test http request 4 passed\n");
 }

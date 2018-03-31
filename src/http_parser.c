@@ -249,7 +249,26 @@ static int http_parse_encoding(char const *str, char const *end)
 
 static int http_parse_language(char const *str, char const *end)
 {
-    return 0;
+    return YHTTP_AGAIN;
+}
+static int http_parse_host_and_port(http_request_t *r, char const *start, char const *end)
+{
+    char const *p;
+    for (p = start; p < end; p++)
+        if (':' == *p)
+            break;
+    if (p >= end) {
+        r->hdr_req.host.str = start;
+        r->hdr_req.host.len = end-start;
+    } else {
+        int port = atoi(p+1);
+        if (0 >= port)
+            return YHTTP_ERROR;
+        r->hdr_req.port = port;
+        r->hdr_req.host.str = start;
+        r->hdr_req.host.len = p-start;
+    }
+    return YHTTP_OK;
 }
 
 static int http_parse_range(http_request_t *r, char const *start, char const *end)
@@ -258,18 +277,18 @@ static int http_parse_range(http_request_t *r, char const *start, char const *en
     while (start < end && '=' != *start)
         start++;
     if (start == end) {
-        r->res.code = HTTP_400; /* Bad Rquest */
+        r->hdr_res.code = HTTP_400; /* Bad Rquest */
         return YHTTP_ERROR;
     }
     start++;
     if ('-' == *start) {
-        if (1 == sscanf(start, "%d", &r->req.range1))
+        if (1 == sscanf(start, "%d", &r->hdr_req.range1))
             return YHTTP_AGAIN;
-        r->res.code = HTTP_400;
+        r->hdr_res.code = HTTP_400;
         return YHTTP_ERROR;
     }
     if (isdigit(*start)) {
-        int n = sscanf(start, "%d-%d", &r->req.range1, &r->req.range2);
+        int n = sscanf(start, "%d-%d", &r->hdr_req.range1, &r->hdr_req.range2);
         return (0 == n)? YHTTP_ERROR: YHTTP_AGAIN;
     }
     return YHTTP_ERROR;
@@ -291,8 +310,8 @@ static int http_parse_key_of_hdr(http_request_t *r, char *start, char *end)
 
 static int http_parse_value_of_hdr(http_request_t *r, char const *start, char const *end)
 {
-    struct http_head_req *req = &r->req;
-    struct http_head_com *com = &r->com;
+    struct http_head_req *req = &r->hdr_req;
+    struct http_head_com *com = &r->hdr_com;
     int len = end-start;
     yhttp_debug2("value: %.*s\n", len, start);
     switch (r->hdr_type) {
@@ -360,8 +379,7 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
         req->from.len = len;
         break;
     case HDR_HOST:
-        req->host.str = start;
-        req->host.len = len;
+        return http_parse_host_and_port(r, start, end);
         break;
     case HDR_IF_MATCH:
         break;
@@ -396,6 +414,8 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
         req->user_agent.len = len;
         break;
     case HDR_COOKIE:
+        req->cookie.str = start;
+        req->cookie.len = len;
         break;
 
     case HDR_UPGRADE_INSECURE_REQUESTS:
@@ -414,7 +434,7 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
 static void http_parse_file_suffix(http_request_t *r, char const *start, char const *end)
 {
 #define SUFFIX_LEN 5
-    struct http_head_req *req = &r->req;
+    struct http_head_req *req = &r->hdr_req;
     req->suffix.str = NULL;
     req->suffix.len = 0;
     if (start < end-SUFFIX_LEN)
@@ -455,9 +475,9 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
         PS_END,
     };
 
-    struct http_head_com *com = &r->com;
-    struct http_head_req *req = &r->req;
-    struct http_head_res *res = &r->res;
+    struct http_head_com *com = &r->hdr_com;
+    struct http_head_req *req = &r->hdr_req;
+    struct http_head_res *res = &r->hdr_res;
     char *pos;
     char *p;
 
@@ -528,9 +548,10 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
                 case 7:
                     if (!strncmp("OPTIONS", pos, 7))
                         req->method = HTTP_OPTIONS;
-                    else if (!strncmp("CONNECT", pos, 7))
+                    else if (!strncmp("CONNECT", pos, 7)) {
                         req->method = HTTP_CONNECT;
-                    else
+                        return_error(HTTP_501);
+                    } else
                         return_error(HTTP_400);
                     break;
 

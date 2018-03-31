@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include <unistd.h>
-#include <semaphore.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <netinet/ip.h>
@@ -73,12 +72,11 @@ extern int run_worker(int id, int sfd)
     }
 
     c->fd = ENV.sfd;
-    c->rev = rev;
     rev->handle = event_accept_request;
     rev->data = c;
     rev->accept = 1;
-    
-    event_add(rev, EVENT_READ);
+
+    connection_event_add(c, EVENT_READ, rev);
     for (;;) {
         /* TODO handle all master's instructions */
         if (ENV.quit)
@@ -90,7 +88,7 @@ extern int run_worker(int id, int sfd)
     yhttp_debug2("break the loop\n");
 
     /* TODO destroy memory pool */
-    event_del(rev, EVENT_READ);
+    rev = connection_event_del(c, EVENT_READ);
 
     connection_free(c);
 con_err:

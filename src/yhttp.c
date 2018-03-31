@@ -23,28 +23,23 @@
 #include "setting.h"
 #include "worker.h"
 
-#define BACKLOG     SOMAXCONN
-#define WORKS       2
-
 static int as_deamon = 0;
 static int log = 0;
-static uint16_t port = 80;
 
-static pid_t works[WORKS];
-static int32_t alive = 0;
+static int worker = YHTTP_WORKER_CFG;
+static pid_t works[YHTTP_WORKER_MAX];
+static int64_t alive = 0;
 static char quit = 0;
 
 static void help(int argc, char **argv)
 {
-    printf("usage: %s [OPTIONS]\n"
-           "a sample http server, for studing.\n"
+    printf("Usage: %s [OPTIONS]\n"
+           "a simple but powerful http server, just for studing.\n"
            "OPTIONS:\n"
            "      -r path    set `www` directory, default current directory(.)\n"
-           "      -p port    specify a port, default 80\n"
-           "      -d         run as daemon\n"
-           "      -c path    specify `cgi` directory, default current directory(.)\n"
+           "      -p num     port\n"
            "      -w num     create num number worker process.\n"
-           "      -e path    specify `status-codes` file directory, default `$www/err-codes`\n"
+           "      -d         run as daemon\n"
            "      -l path    specify the log file.\n"
            "      -v <1,2>   verbose.\n"
            "      -h         show this page.\n"
@@ -54,26 +49,42 @@ static void help(int argc, char **argv)
            "Author: leetking <li_Tking@63.com>\n",
            argv[0], argv[0], VER);
 }
-static int parse_opt(int argc, char **argv)
+
+static int parse_opt(int argc, char **argv, struct setting_t *setting)
 {
     int ret = 0;
     int c;
     int v;
+    struct setting_vars *vars = &setting->vars;
+    struct setting_server *ser = &setting->server;
+    struct setting_static *dft_sta = (struct setting_static*)ser->map->setting;
     while ((c = getopt(argc, argv, "r:p:dc:w:e:l:v:h")) != -1) {
         switch (c) {
         case 'r':
-            //strncpy(SETTING.root_path, optarg, strlen(optarg));
-            yhttp_debug2("Master# path of root: %s\n", SETTING.root_path);
+            dft_sta->root.str = optarg;
+            dft_sta->root.len = strlen(optarg);
+            yhttp_debug2("Master# root %s\n", dft_sta->root.str);
             break;
         case 'p':
-            port = atoi(optarg);
-            yhttp_debug2("Master# listening at port: %d\n", port);
+            v = atoi(optarg);
+            if (0 == v)
+                yhttp_info("Master# the port is invalid\n");
+            else
+                ser->port = v;
+            yhttp_debug2("Master# listening at port: %d\n", ser->port);
             break;
         case 'd':
             break;
         case 'c':
             break;
         case 'w':
+            v = atoi(optarg);
+            if (0 == v)
+                yhttp_info("Master# the count of worker is invalid\n");
+            else
+                vars->worker = MIN(v, YHTTP_WORKER_MAX);
+            worker = vars->worker;
+            yhttp_debug2("Master# the count of worker : %d\n", vars->worker);
             break;
         case 'e':
             break;
@@ -100,7 +111,7 @@ static void kill_workers(int _)
     (void)_;
     yhttp_debug2("Master# catch SIGINT, quit.\n");
     quit = 1;
-    for (int i = 0; i < WORKS; i++)
+    for (int i = 0; i < worker; i++)
         kill(works[i], SIGINT);
 }
 
@@ -115,8 +126,15 @@ int main(int argc, char **argv)
     int on = 1;
     int sfd;                /* fd of server */
     struct sockaddr_in sip;
+    struct setting_vars const *VARS = &SETTING.vars;
+    struct setting_server const *SER = &SETTING.server;
 
-    if (0 != parse_opt(argc, argv))
+    if (YHTTP_OK != setting_init_default(&SETTING)) {
+        yhttp_error("A fatal error in initial phase\n Quit\n");
+        return 1;
+    }
+
+    if (YHTTP_OK != parse_opt(argc, argv, &SETTING))
         return 1;
 
     /* TODO support ipv6 */
@@ -127,10 +145,10 @@ int main(int argc, char **argv)
     }
     memset(&sip, 0, sizeof(sip));
     sip.sin_family = AF_INET;
-    sip.sin_port   = htons(port);
+    sip.sin_port   = htons(SER->port);
     sip.sin_addr.s_addr = htonl(INADDR_ANY);
     if (-1 == bind(sfd, (struct sockaddr*)&sip, sizeof(sip))) {
-        yhttp_error("Master# Bind to any address(0.0.0.0:%d): %s\n", port, strerror(errno));
+        yhttp_error("Master# Bind to any address(0.0.0.0:%d): %s\n", SER->port, strerror(errno));
         ret = 3;
         goto sfd_err;
     }
@@ -140,9 +158,9 @@ int main(int argc, char **argv)
         yhttp_warn("Master# setsockopt: %s\n", strerror(errno));
     set_nonblock(sfd);
 
-    yhttp_info("Master# Listen at http://0.0.0.0:%d\n", port);
-    if (-1 == listen(sfd, BACKLOG)) {
-        yhttp_warn("Master# Listen at port(%d) error, BACKLOG is %d: %s\n", port, BACKLOG, strerror(errno));
+    yhttp_info("Master# Listen at http://0.0.0.0:%d\n", SER->port);
+    if (-1 == listen(sfd, VARS->backlog)) {
+        yhttp_warn("Master# Listen at port(%d) error, BACKLOG is %d: %s\n", SER->port, VARS->backlog, strerror(errno));
         ret = 4;
         goto sfd_err;
     }
@@ -155,12 +173,14 @@ int main(int argc, char **argv)
     }
 
     /* fork and run the worker */
-    for (int i = 0; i < WORKS; i++) {
+    for (int i = 0; i < VARS->worker; i++) {
         pid_t pid = fork();
         switch (pid) {
         case 0: /* child */
             set_cpu_affinity(i);
-            exit(run_worker(i, sfd));
+            ret = run_worker(i, sfd);
+            setting_destroy(&SETTING);
+            exit(ret);
             break;
         case -1:
             yhttp_warn("Master# Fork error for %d#: %s\n", i, strerror(errno));
@@ -182,7 +202,7 @@ int main(int argc, char **argv)
         pid_t pid = wait(NULL);
 
         /* find the id of work process */
-        for (id = 0; id < WORKS; id++) {
+        for (id = 0; id < VARS->worker; id++) {
             if (pid == works[id]) {
                 works[id] = -1;
                 alive &= ~(1<<id);
@@ -200,7 +220,9 @@ int main(int argc, char **argv)
             pid_t neopid = fork();
             if (0 == neopid) {
                 set_cpu_affinity(id);
-                exit(run_worker(id, sfd));
+                ret = run_worker(id, sfd);
+                setting_destroy(&SETTING);
+                exit(ret);
 
             } else if (-1 == neopid) {
                 yhttp_warn("Master# Restart work process %d# error\n", id);
@@ -215,6 +237,7 @@ int main(int argc, char **argv)
     sem_unlink(ACCEPT_LOCK);
 sfd_err:
     close(sfd);
+    setting_destroy(&SETTING);
     yhttp_info("Master# Bye.\n");
 
     return ret;

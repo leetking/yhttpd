@@ -7,7 +7,7 @@
 
 typedef struct http_file_t {
     struct stat stat;
-    connection_t *duct;                 /* a static file or a pipe */
+    connection_t *duct;                 /* a static file */
 } http_file_t;
 
 #endif
