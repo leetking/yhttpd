@@ -30,7 +30,7 @@ error_page_err:
     return YHTTP_ERROR;
 }
 
-extern void http_destroy()
+extern void http_exit()
 {
     http_error_page_destroy();
     http_parse_destroy();
@@ -46,6 +46,7 @@ extern void http_request_reuse(http_request_t *r)
 {
     struct http_head_req *req = &r->hdr_req;
     struct http_head_com *com = &r->hdr_com;
+    struct http_head_res *res = &r->hdr_res;
     buffer_init(r->hdr_buffer);
     buffer_init(r->res_buffer);
     r->parse_pos = r->hdr_buffer->pos;
@@ -57,6 +58,8 @@ extern void http_request_reuse(http_request_t *r)
     req->if_none_match.len = 0;
     com->content_length = 0;
     com->content_encoding = HTTP_UNCHUNKED;
+    res->server.str = "yhttpd/"VER;
+    res->server.len = SSTR_LEN("yhttpd/"VER);
 }
 
 extern http_request_t *http_request_malloc()
@@ -81,6 +84,7 @@ req_head_err:
     return NULL;
 }
 
+/* just free allocated by http_request_malloc */
 extern void http_request_free(http_request_t *req)
 {
     BUG_ON(NULL == req);
@@ -90,10 +94,12 @@ extern void http_request_free(http_request_t *req)
     yhttp_free(req);
 }
 
+/* free all buffer */
 extern void http_request_destroy(http_request_t *r)
 {
     buffer_free(r->hdr_buffer);
     buffer_free(r->res_buffer);
+    buffer_free(r->ety_buffer);
     yhttp_free(r);
 }
 
@@ -193,7 +199,8 @@ extern int http_build_response_head(http_request_t *r)
     /* Expires is ignored */
 
     /* Server */
-    len = snprintf(resb->last, buffer_rest(resb), "Server: yhttpd/"VER CRLF);
+    len = snprintf(resb->last, buffer_rest(resb), "Server: %.*s"CRLF,
+            res->server.len, res->server.str);
     resb->last += len;
 
     /* Content Type */
@@ -205,7 +212,7 @@ extern int http_build_response_head(http_request_t *r)
     if (HTTP11 == com->version) {
         /* Content Length is not MUST by response, but MUST by resquest in HTTP/1.0 */
         if (com->transfer_encoding == HTTP_CHUNKED) {
-            len = snprintf(resb->last, buffer_rest(resb), "Transfer-Encoding: chuncked"CRLF);
+            len = snprintf(resb->last, buffer_rest(resb), "Transfer-Encoding: chunked"CRLF);
         } else {
             len = snprintf(resb->last, buffer_rest(resb), "Content-Length: %d"CRLF,
                     com->content_length);
@@ -260,7 +267,7 @@ extern int http_build_response_head(http_request_t *r)
         gmt = gmtime(&com->last_modified);
         len = snprintf(resb->last, buffer_rest(resb), "Last-Modified: %s, %02d %s %4d %02d:%02d:%02d GMT"CRLF,
                 week[gmt->tm_wday], gmt->tm_mday,
-                months[gmt->tm_mon - 1], gmt->tm_year+1900,
+                months[gmt->tm_mon], gmt->tm_year+1900,
                 gmt->tm_hour, gmt->tm_min, gmt->tm_sec);
         resb->last += len;
         break;
@@ -302,7 +309,7 @@ extern http_dispatcher_t http_dispatch(http_request_t *r)
     com->content_length = file->stat.st_size;
     com->last_modified = file->stat.st_ctim.tv_sec;
     com->pragma = HTTP_PRAGMA_UNSET;
-    com->content_type = http_mime_get(req->suffix.str, req->suffix.len);
+    com->content_type = http_mime_get(req->suffix, req->suffix_len);
     com->transfer_encoding = HTTP_UNCHUNKED;
     r->pos = 0;
     r->last = com->content_length;
@@ -409,5 +416,11 @@ extern int http_request_extend_hdr_buffer(http_request_t *r)
     r->hdr_buffer = b;
     r->parse_pos = b->pos;
     /* must REPARSE the header ... */
+    return YHTTP_OK;
+}
+
+extern int http_chunk_transmit_over(char const *start, char const *end)
+{
+    /* TODO finish chunck check */
     return YHTTP_OK;
 }

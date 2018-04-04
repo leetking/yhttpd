@@ -76,7 +76,7 @@ extern int run_worker(int id, int sfd)
     rev->data = c;
     rev->accept = 1;
 
-    connection_event_add(c, EVENT_READ, rev);
+    connection_event_add_now(c, EVENT_READ, rev);
     for (;;) {
         /* TODO handle all master's instructions */
         if (ENV.quit)
@@ -94,7 +94,7 @@ extern int run_worker(int id, int sfd)
 con_err:
     event_free(rev);
 rev_err:
-    http_destroy();
+    http_exit();
 init_err:
     event_quit();
 

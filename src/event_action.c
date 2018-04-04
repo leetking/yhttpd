@@ -18,13 +18,44 @@
 #include "http_parser.h"
 #include "setting.h"
 #include "http_time.h"
-#include "http_mime.h"
 #include "http_wildcard.h"
 #include "http_page.h"
 #include "http_file.h"
 #include "http_error_page.h"
 #include "setting.h"
 #include "fastcgi.h"
+
+#undef B0
+#undef B1
+#define B0(x)   ((x)&0xff)
+#define B1(x)   (B0((x)>>8))
+
+static char* chunk_data(char *buff, int size)
+{
+    static char t[] = "0123456789ABCDEF";
+    /* xxxx CRLF .... CRLF */
+    buff[size] = CR;
+    buff[size+1] = LF;
+    *(--buff) = LF;
+    *(--buff) = CR;
+    int i = 4;
+    do {
+        *(--buff) = t[size&0x0f];
+        size >>= 4;
+        --i;
+    } while (size && i > 0);
+    return buff;
+}
+
+static int hex_len(int n)
+{
+    int i = 0;
+    while (n) {
+        i ++;
+        n >>= 4;
+    }
+    return i;
+}
 
 extern void event_accept_request(event_t *rev)
 {
@@ -57,7 +88,7 @@ extern void event_accept_request(event_t *rev)
     ev->handle = event_init_http_request;
 
     c->fd = cfd;
-    connection_event_add(c, EVENT_READ, ev);
+    connection_event_add_now(c, EVENT_READ, ev);
     connection_read_timeout(c, current_msec+SETTING.vars.timeout);
 
     yhttp_debug("Accepted a new request %d tmstamp: %ld\n", c->fd, c->tmstamp);
@@ -137,7 +168,7 @@ extern void event_parse_http_head(event_t *sev)
         /* Update read  timeout */
         connection_read_timeout(c, current_msec+SETTING.vars.timeout);
         rb->last += rdn;
-        if (rb->last >= rb->end) {
+        if (0 >= buffer_rest(rb)) {
             yhttp_info("Http request extend header buffer\n");
             int s = http_request_extend_hdr_buffer(r);
             if (YHTTP_ERROR == s) {
@@ -192,7 +223,7 @@ extern void event_parse_http_head(event_t *sev)
                         yhttp_debug("match static router\n");
                         if (YHTTP_OK == http_check_request(r)) {
                             yhttp_debug("Http request checking 1 passed\n");
-                            http_init_response(sev, ser->map->setting);
+                            http_init_response(sev, url_map->setting);
                         } else {
                             yhttp_debug("Http request checking 1 can't pass\n");
                             http_init_error_page(ev);
@@ -201,7 +232,7 @@ extern void event_parse_http_head(event_t *sev)
                         break;
                     case YHTTP_SETTING_FASTCGI:
                         yhttp_debug("match fastcgi router\n");
-                        http_fastcgi_respond(ev, ser->map->setting);
+                        http_fastcgi_respond(ev, url_map->setting);
                         return;
                         break;
                     default:
@@ -231,7 +262,7 @@ extern void http_init_special_response(event_t *sev)
     http_build_response_head(r);
 
     sev->handle = event_respond_page;
-    connection_event_add(sc, EVENT_WRITE, sev);
+    connection_event_add_now(sc, EVENT_WRITE, sev);
 }
 
 extern void http_init_error_page(event_t *sev)
@@ -262,15 +293,13 @@ extern void http_init_error_page(event_t *sev)
     http_build_response_head(r);
 
     sev->handle = event_respond_page;
-    connection_event_add(sc, EVENT_WRITE, sev);
+    connection_event_add_now(sc, EVENT_WRITE, sev);
 }
 
 extern void event_respond_page(event_t *sev)
 {
     connection_t *sc = sev->data;
     http_request_t *r = sc->data;
-    struct http_head_req *req = &r->hdr_req;
-    struct http_head_res *res = &r->hdr_res;
     struct http_head_com *com = &r->hdr_com;
     http_page_t const *page = r->backend.page;
     buffer_t *wbuffer = r->res_buffer;
@@ -314,7 +343,7 @@ extern void event_respond_page(event_t *sev)
                 /* reuse @sev as a read event for the next request on this connection */
                 sev = connection_event_del(sc, EVENT_WRITE);
                 sev->handle = event_parse_http_head;
-                connection_event_add(sc, EVENT_READ, sev);
+                connection_event_add_now(sc, EVENT_READ, sev);
                 connection_read_timeout(sc, current_msec+SETTING.vars.timeout);
                 return;
             }
@@ -347,8 +376,6 @@ void http_init_static_file(event_t *sev, string_t const *fname)
     struct http_head_res *res = &r->hdr_res;
     struct http_head_com *com = &r->hdr_com;
     http_file_t *file = &r->backend.file;
-
-    BUG_ON(r->backend_type != HTTP_REQUEST_BACKEND_FILE);
 
     fd = open(fname->str, O_RDONLY);
     if (-1 == fd) {
@@ -385,14 +412,14 @@ void http_init_static_file(event_t *sev, string_t const *fname)
     fc->data = sc;       /* hold my peer(the network connection) */
     fev->data = fc;
     fev->handle = event_read_file;
-    connection_event_add(fc, EVENT_READ, fev);
+    connection_event_add_now(fc, EVENT_READ, fev);
+    /* connection_read_timeout(fc, current_msec+SETTING.vars.timeout); */
 
     http_build_response_head(r);
 
     /* reuse @sev as a write event */
     sev->handle = event_send_file;
     connection_event_add(sc, EVENT_WRITE, sev);
-    connection_pause(sc, EVENT_WRITE);
 }
 
 extern void http_init_response(event_t *sev, struct setting_static *sta)
@@ -408,8 +435,6 @@ extern void http_init_response(event_t *sev, struct setting_static *sta)
     struct stat *st = &file->stat;
     string_t const *fname = &req->uri;
 
-    r->backend_type = HTTP_REQUEST_BACKEND_FILE;
-
     if (1 == req->uri.len && '/' == req->uri.str[0])
         fname = &sta->index;
 
@@ -423,6 +448,8 @@ extern void http_init_response(event_t *sev, struct setting_static *sta)
         http_init_error_page(sev);
         return;
     }
+
+    http_parse_file_suffix(r, uri, uri+uri_len);
 
     path.str = uri;
     path.len = uri_len;
@@ -447,58 +474,71 @@ extern void http_init_response(event_t *sev, struct setting_static *sta)
     }
 }
 
-extern void http_fastcgi_respond(event_t *rev, struct setting_fastcgi *setting_fcgi)
+extern void http_fastcgi_respond(event_t *sev, struct setting_fastcgi *setting_fcgi)
 {
-    connection_t *rc = rev->data;
-    http_request_t *r = rc->data;
-    struct http_head_req *req = &r->hdr_req;
+    event_t *fev;
+    connection_t *fc;
+    connection_t *sc = sev->data;
+    http_request_t *r = sc->data;
     struct http_head_com *com = &r->hdr_com;
     struct http_head_res *res = &r->hdr_res;
-    int need_body = HTTP_POST|HTTP_PUT;
-    int read_body = 0;
-
-    event_t *wev = event_malloc();
     http_fastcgi_t *fcgi = &r->backend.fcgi;
-    connection_t *wc = fastcgi_connection_get(setting_fcgi);
-    /* TODO CONTINUE fastcgi process malloc failure */
-    if (YHTTP_OK != http_fastcgi_init(fcgi)) {
-        res->code = HTTP_403;
-        http_init_error_page(rev);
+
+    fev = event_malloc();
+    if (!fev) {
+        yhttp_debug("event malloc error\n");
+        res->code = HTTP_500;
+        http_init_error_page(sev);
         return;
     }
 
-    if (req->method & need_body) {
-        r->bdy_buffer = buffer_malloc(YHTTP_BUFFER_SIZE_CFG);
-        if (!r->bdy_buffer) {
-            res->code = HTTP_500;
-            http_init_error_page(rev);
-            return;
-        }
-        /* copy the rest part of @r->hdr_buffer */
-        r->hdr_buffer->pos = r->parse_pos;
-        buffer_copy(r->bdy_buffer, r->hdr_buffer);
-
-        /* TODO reqeust support chuncked */
-        if (buffer_len(r->bdy_buffer) < com->content_length)
-            read_body = 1;
+    if (YHTTP_OK != http_fastcgi_init(fcgi)) {
+        yhttp_debug("init fastcgi error\n");
+        event_free(fev);
+        res->code = HTTP_500;
+        http_init_error_page(sev);
+        return;
     }
+
+    fc = fastcgi_connection_get(setting_fcgi);
+    if (!fc) {
+        yhttp_debug("fastcgi get a connection error\n");
+        http_fastcgi_destroy(fcgi);
+        event_free(fev);
+        res->code = HTTP_500;
+        http_init_error_page(sev);
+        return;
+    }
+
+    r->ety_buffer = buffer_malloc(YHTTP_BUFFER_SIZE_CFG);
+    if (!r->ety_buffer) {
+        yhttp_debug("alloc memory for body buffer error\n");
+        connection_destroy(fc);
+        http_fastcgi_destroy(fcgi);
+        event_free(fev);
+        res->code = HTTP_500;
+        http_init_error_page(sev);
+        return;
+    }
+
+    r->hdr_buffer->pos = r->parse_pos;
+    r->pos = buffer_len(r->hdr_buffer);
+    r->last = com->content_length;
+    if (r->pos >= r->last)
+        sc->rd_eof = 1;
 
     /* begin request, params and part reqeust body */
-    http_fastcgi_build_th(r);
+    http_fastcgi_build(r);
 
-    fcgi->requst_con = rc;
-    wev->handle = event_send_to_fcgi;
-    wev->data = wc;
-    wc->data = fcgi;
-    event_add(wev, EVENT_WRITE);
-    if (read_body) {
-        rev->handle = event_read_request_body;
-        event_del_timer(rev);               /* update timer */
-        rc->tmstamp = current_msec+SETTING.vars.timeout;
-        event_add_timer(rev);
-    } else {
-        event_del(rev, EVENT_READ);
-    }
+    fcgi->fastcgi_con = fc; /* the network connection cant find me through @fcgi->fastcgi_con */
+    fc->data = sc;          /* hold my peer(the network connection) */
+    fev->data = fc;
+    fev->handle = event_send_to_fcgi;
+    connection_event_add_now(fc, EVENT_WRITE, fev);
+
+    /* switch to read request body */
+    sev->handle = event_read_request_body;
+    connection_event_add(sc, EVENT_READ, sev);
 }
 
 extern void event_read_file(event_t *fev)
@@ -513,27 +553,25 @@ extern void event_read_file(event_t *fev)
     BUG_ON(NULL == sc->data);
     BUG_ON(NULL == b);
     BUG_ON(NULL == fev);
-    BUG_ON(r->backend_type != HTTP_REQUEST_BACKEND_FILE);
 
     for (;;) {
-        char *end = b->last+MIN(b->end - b->last, r->last - r->pos);
+        char *end = b->last+MIN(buffer_rest(b), r->last - r->pos);
         int rdn = connection_read(fc->fd, b->last, end);
         if (YHTTP_AGAIN == rdn)
             continue;
-        if (YHTTP_BLOCK == rdn || b->last == b->end) {
-            if (b->pos < b->last) {
-                yhttp_debug2("read file(%d)\n", b->last - b->pos);
-                connection_pause(fc, EVENT_READ);
-                connection_revert(sc, EVENT_WRITE);
-            }
-            return;
-        }
         if (YHTTP_ERROR == rdn) {
             yhttp_debug2("read file error YHTTP_ERROR: %s\n", strerror(errno));
             connection_destroy(fc);
             sev = connection_event_del(fc, EVENT_WRITE);
             res->code = HTTP_500;
             http_init_error_page(sev);
+            return;
+        }
+        if (YHTTP_BLOCK == rdn || 0 == buffer_rest(b)) {
+            BUG_ON(b->pos >= b->last);
+            yhttp_debug2("read file(%d)\n", b->last - b->pos);
+            connection_pause(fc, EVENT_READ);
+            connection_revert(sc, EVENT_WRITE);
             return;
         }
 
@@ -562,7 +600,6 @@ extern void event_send_file(event_t *sev)
 
     /* no data */
     BUG_ON(b->pos >= b->last);
-    BUG_ON(r->backend_type != HTTP_REQUEST_BACKEND_FILE);
 
     for (;;) {
         int wrn = connection_write(sc->fd, b->pos, b->last);
@@ -594,7 +631,7 @@ extern void event_send_file(event_t *sev)
                 /* reuse @sev as a read event for the next request on this connection */
                 sev = connection_event_del(sc, EVENT_WRITE);
                 sev->handle = event_parse_http_head;
-                connection_event_add(sc, EVENT_READ, sev);
+                connection_event_add_now(sc, EVENT_READ, sev);
                 connection_read_timeout(sc, current_msec+SETTING.vars.timeout);
                 return;
             }
@@ -613,84 +650,350 @@ finish_request:
     connection_destroy(sc);
 }
 
-extern void event_read_request_body(event_t *rev)
+extern void event_send_to_fcgi(event_t *fev)
 {
-}
+    connection_t *fc = fev->data;
+    connection_t *sc = fc->data;
+    http_request_t *r = sc->data;
+    buffer_t *b = r->ety_buffer;
 
-
-extern void event_send_to_fcgi(event_t *wev)
-{
-    connection_t *wc = wev->data;
-    http_fastcgi_t *fcgi = wc->data;
-    connection_t *rc = fcgi->requst_con;
-    buffer_t *b = fcgi->req_buffer;
-
+    /* if it is empty */
     BUG_ON(b->pos >= b->last);
 
     for (;;) {
-        int wrn = connection_write(wc->fd, b->pos, b->last);
+        int wrn = connection_write(fc->fd, b->pos, b->last);
 
         if (YHTTP_AGAIN == wrn)
             continue;
         if (YHTTP_BLOCK == wrn) {
-            yhttp_debug2("write return YHTTP_BLOCK\n");
+            yhttp_debug2("write fastcgi return YHTTP_BLOCK\n");
             return;
         }
-        if (YHTTP_ERROR == wrn) {
-            yhttp_debug2("write fcgi error YHTTP_ERROR\n");
-            goto read_err;
+        if (unlikely(YHTTP_ERROR == wrn)) {
+            yhttp_debug2("write fastcgi error YHTTP_ERROR\n");
+            http_fastcgi_t *fcgi = &r->backend.fcgi;
+            http_fastcgi_destroy(fcgi);
+            http_request_destroy(r);
+            connection_destroy(sc);
+            connection_destroy(fc);
+            return;
         }
         b->pos += wrn;
 
         if (b->pos == b->last) {
             yhttp_debug2("drain over the write buffer\n");
-            if (rc->rd_eof) {
-                yhttp_debug2("Client %d request body finish\n", rc->fd);
+            if (sc->rd_eof) {
+                yhttp_debug2("Client %d request body finish\n", fc->fd);
+                event_t *sev = connection_event_del(sc, EVENT_READ);
+                BUG_ON(sev->data != sc);
+                sev->handle = event_send_fcgi_to_client;
+                connection_event_add(sc, EVENT_WRITE, sev);
 
-                wev->handle = event_read_fcgi;
-                wc->tmstamp = current_msec+SETTING.vars.timeout;
-                event_add_timer(wev);
-                event_del(wev, EVENT_WRITE);
-                event_add(wev, EVENT_READ);
+                fev = connection_event_del(fc, EVENT_WRITE);
+                BUG_ON(fev->data != fc);
+                fev->handle = event_read_fcgi_packet_hdr;
+                connection_event_add_now(fc, EVENT_READ, fev);
+                connection_read_timeout(fc, current_msec+SETTING.vars.timeout);
                 return;
             }
             buffer_init(b);
+            connection_pause(fc, EVENT_WRITE);
+            connection_revert(sc, EVENT_READ);
+            connection_read_timeout(sc, current_msec+SETTING.vars.timeout);
             return;
         }
     }
-    return;
-
-read_err:
-    return;
 }
 
-extern void event_read_fcgi(event_t *rev)
+extern void event_read_request_body(event_t *sev)
 {
-    connection_t *rc = rev->data;
-    http_fastcgi_t *fcgi = rc->data;
-    connection_t *wc = fcgi->requst_con;
-    http_request_t *r = wc->data;
+    connection_t *sc = sev->data;
+    http_request_t *r = sc->data;
+    http_fastcgi_t *fcgi = &r->backend.fcgi;
+    connection_t *fc = fcgi->fastcgi_con;
+    buffer_t *b = r->ety_buffer;
+    FCGI_Header *fcgi_hdr = (FCGI_Header*)b->last;
+    b->last += FCGI_HEADER_LEN;     /* reserve space of header */
 
-    if (rev->timeout) {
-        BUG_ON(rev->timeout && !rev->timeout_set);
+    /* NOTE As FCGI_PADDING_MAXLEN is 8, we can ... */
+    /* there are least two fastcgi header and padding */
+    BUG_ON(((buffer_rest(b) - FCGI_HEADER_LEN)>>3) <= 0);
+    BUG_ON(r->pos >= r->last);
+
+    for (;;) {
+        int maxrdn = MIN((buffer_rest(b) - FCGI_HEADER_LEN) & ~0x07 , FCGI_RECORD_MAXLEN);
+        maxrdn = MIN(maxrdn, r->last - r->pos);
+        int rdn = connection_read(sc->fd, b->last, b->last + maxrdn);
+        if (rdn == YHTTP_AGAIN)
+            continue;
+        if (unlikely(rdn == YHTTP_ERROR)) {
+            yhttp_debug2("read request body error\n");
+            http_fastcgi_t *fcgi = &r->backend.fcgi;
+            http_fastcgi_destroy(fcgi);
+            http_request_destroy(r);
+            connection_destroy(sc);
+            connection_destroy(fc);
+            return;
+        }
+        /* read until fill the buffer */
+        if (rdn == YHTTP_BLOCK) {
+            yhttp_debug2("read fastcgi return YHTTP_BLOCK\n");
+            return;
+        }
+        b->last += rdn;
+        r->pos += rdn;
+
+        /* read finish or buffer is full */
+        if (r->pos >= r->last || buffer_rest(b) == FCGI_HEADER_LEN) {
+            yhttp_debug2("read body (%d)", buffer_len(b));
+            fcgi_hdr->version = FCGI_VERSION_1;
+            fcgi_hdr->type = FCGI_STDIN;
+            fcgi_hdr->requsetIdB0 = B0(fcgi->request_id);
+            fcgi_hdr->requsetIdB1 = B1(fcgi->request_id);
+            fcgi_hdr->contentLengthB0 = B0(buffer_len(b));
+            fcgi_hdr->contentLengthB1 = B1(buffer_len(b));
+            fcgi_hdr->paddingLength = (~buffer_len(b) + 1) & 0x07;
+            b->last += fcgi_hdr->paddingLength;
+            if (r->pos >= r->last) {
+                sc->rd_eof = 1;
+                fcgi_hdr = (FCGI_Header*)b->last;
+                fcgi_hdr->version = FCGI_VERSION_1;
+                fcgi_hdr->type = FCGI_STDIN;
+                fcgi_hdr->requsetIdB0 = B0(fcgi->request_id);
+                fcgi_hdr->requsetIdB1 = B1(fcgi->request_id);
+                fcgi_hdr->contentLengthB0 = 0;
+                fcgi_hdr->contentLengthB1 = 0;
+                fcgi_hdr->paddingLength = 0;
+                b->last += FCGI_HEADER_LEN;
+                sev = connection_event_del(sc, EVENT_READ);
+                sev->handle = event_send_to_fcgi;
+                connection_event_add(sc, EVENT_WRITE, sev);
+            } else {
+                connection_pause(sc, EVENT_READ);
+            }
+            connection_revert(fc, EVENT_WRITE);
+            return;
+        }
+    }
+}
+
+extern void event_read_fcgi_packet_hdr(event_t *fev)
+{
+    connection_t *fc = fev->data;
+    connection_t *sc = fc->data;
+    http_request_t *r = sc->data;
+    http_fastcgi_t *fcgi = &r->backend.fcgi;
+    struct http_head_res *res = &r->hdr_res;
+    buffer_t *b = fcgi->res_buffer;
+    FCGI_Header *hdr;
+    int rdn;
+    int rdmax;
+
+    if (fev->timeout) {
+        BUG_ON(fev->timeout && !fev->timeout_set);
         yhttp_debug2("read fcgi time out\n");
-        goto free_fcgi;
+        connection_destroy(fc);
+        connection_destroy(sc);
+        http_fastcgi_destroy(fcgi);
+        http_request_destroy(r);
+        return;
     }
 
     for (;;) {
-    }
-    return;
+        rdmax = MIN(buffer_rest(b), FCGI_HEADER_LEN - fcgi->hdr_pos);
+        rdn = connection_read(fc->fd, b->last, b->last + rdmax);
+        if (rdn == YHTTP_AGAIN)
+            continue;
+        if (rdn == YHTTP_ERROR) {
+            event_t *sev;
+            yhttp_debug2("read fcgi error or finish\n");
+            connection_destroy(fc);
+            http_fastcgi_destroy(fcgi);
+            sev = connection_event_del(sc, EVENT_WRITE);
+            res->code = HTTP_500;
+            http_init_error_page(sev);
+            return;
+        }
+        if (rdn == YHTTP_BLOCK) {
+            yhttp_debug2("read fastcgi packet header return YHTTP_BLOCK\n");
+            return;
+        }
+        b->last += rdn;
+        fcgi->hdr_pos += rdn;
 
-free_fcgi:
-    event_del(rev, EVENT_READ);
-    event_del_timer(rev);
-    close(rc->fd);
-    connection_free(rc);
-    event_free(rev);
-    http_request_free(r);
-    buffer_free(fcgi->req_buffer);
-    buffer_free(fcgi->res_buffer);
-    connection_free(wc);
-    return;
+        if (fcgi->hdr_pos >= FCGI_HEADER_LEN) {
+            hdr = (FCGI_Header*)(b->last - FCGI_HEADER_LEN);
+            fcgi->hdr_pos = 0;
+            fcgi->block_pos = 0;
+            fcgi->block_size = (hdr->contentLengthB1<<8) | hdr->contentLengthB0;
+            fcgi->block_padding_size = hdr->paddingLength;
+            /* roll back, remove header */
+            b->last -= FCGI_HEADER_LEN;
+
+            if (hdr->type == FCGI_END_REQUEST) {
+                fc->rd_eof = 1;
+                *r->res_buffer->last++ = '0';   /* append '0CRLFCRLF' */
+                *r->res_buffer->last++ = CR;
+                *r->res_buffer->last++ = LF;
+                *r->res_buffer->last++ = CR;
+                *r->res_buffer->last++ = LF;
+                connection_pause(fc, EVENT_READ);
+                connection_revert(sc, EVENT_WRITE);
+                return;
+            }
+
+            /* read over */
+            if (hdr->type == FCGI_STDOUT && fcgi->block_size > 0) {
+                if (fcgi->read_body)
+                    r->res_buffer->last += 4+2;     /* 0xffff+CRLF */
+                fcgi->read_padding = 0;
+                fev->handle = event_read_fcgi_packet_bdy;
+                event_read_fcgi_packet_bdy(fev);
+                return;
+            }
+        }
+    }
+}
+
+extern void event_read_fcgi_packet_bdy(event_t *fev)
+{
+    connection_t *fc = fev->data;
+    connection_t *sc = fc->data;
+    http_request_t *r = sc->data;
+    http_fastcgi_t *fcgi = &r->backend.fcgi;
+    struct http_head_res *res = &r->hdr_res;
+    struct http_head_com *com = &r->hdr_com;
+    buffer_t *b = (fcgi->read_body)? r->res_buffer: fcgi->res_buffer;
+    int rdn;
+    int maxrd;
+    int reserve;
+
+    for (;;) {
+        reserve = fcgi->read_body? 2: FCGI_HEADER_LEN;
+        maxrd = fcgi->block_size - fcgi->block_pos + fcgi->block_padding_size;
+        maxrd = MIN(maxrd, buffer_rest(b) - reserve);
+        rdn = connection_read(fc->fd, b->last, b->last + maxrd);
+        if (rdn == YHTTP_AGAIN)
+            continue;
+        if (rdn == YHTTP_ERROR) {
+            yhttp_debug2("read fcgi packet body error or finish\n");
+            connection_destroy(fc);
+            http_fastcgi_destroy(fcgi);
+            connection_destroy(sc);
+            http_request_destroy(r);
+            return;
+        }
+        if (rdn == YHTTP_BLOCK) {
+            yhttp_debug2("read fastcgi packet body return YHTTP_BLOCK\n");
+            return;
+        }
+
+        b->last += rdn;
+        fcgi->block_pos += rdn;
+
+        if (fcgi->read_padding) {
+            if (fcgi->block_pos >= fcgi->block_size + fcgi->block_padding_size) {
+                fcgi->read_padding = 0;
+                fev->handle = event_read_fcgi_packet_hdr;
+            }
+            return;
+        }
+        /* we have to interrupt read */
+        if (fcgi->block_pos >= fcgi->block_size || reserve == buffer_rest(b)) {
+            if (fcgi->block_pos == fcgi->block_size + fcgi->block_padding_size) {
+                fcgi->read_padding = 0;
+                fev->handle = event_read_fcgi_packet_hdr;
+            } else if (fcgi->block_pos >= fcgi->block_size) {
+                fcgi->read_padding = 1;
+            }
+            /* remove padding */
+            if (fcgi->block_pos > fcgi->block_size)
+                b->last = b->last - (fcgi->block_pos - fcgi->block_size);
+
+            if (fcgi->read_body) {
+                b->pos = chunk_data(b->pos+4+2, buffer_len(b)-4-2);
+                b->last += 2;
+                connection_pause(fc, EVENT_READ);
+                connection_revert(sc, EVENT_WRITE);
+            } else {
+                int status = http_fastcgi_parse_response(r, b->pos, b->last);
+                if (unlikely(YHTTP_ERROR == status
+                            || (YHTTP_AGAIN == status && reserve == buffer_rest(b)))) {
+                    yhttp_debug2("parse response error\n");
+                    event_t *sev;
+                    connection_destroy(fc);
+                    http_fastcgi_destroy(fcgi);
+                    sev = connection_event_del(sc, EVENT_WRITE);
+                    res->code = HTTP_500;
+                    http_init_error_page(sev);
+                } else if (YHTTP_OK == status) {
+                    com->transfer_encoding = HTTP_CHUNKED;
+                    com->last_modified = current_sec;
+
+                    http_build_response_head(r);
+                    http_fastcgi_build_extend_head(r);
+                    b->pos = fcgi->parse_pos;
+                    r->res_buffer->last += (hex_len(buffer_len(b))+2);
+                    buffer_copy(r->res_buffer, b);
+                    chunk_data(r->res_buffer->last - buffer_len(b), buffer_len(b));
+                    r->res_buffer->last += 2;
+                    fcgi->read_body = 1;
+                    connection_pause(fc, EVENT_READ);
+                    connection_revert(sc, EVENT_WRITE);
+                }
+            }
+            return;
+        }
+    }
+}
+
+extern void event_send_fcgi_to_client(event_t *sev)
+{
+    connection_t *sc = sev->data;
+    http_request_t *r = sc->data;
+    http_fastcgi_t *fcgi = &r->backend.fcgi;
+    connection_t *fc = fcgi->fastcgi_con;
+    buffer_t *b = r->res_buffer;
+
+    BUG_ON(buffer_len(b) == 0);
+
+    for (;;) {
+        int wrn = connection_write(sc->fd, b->pos, b->last);
+        if (YHTTP_AGAIN == wrn)
+            continue;
+
+        if (YHTTP_ERROR == wrn) {
+            yhttp_debug2("send res_buffer error\n");
+            connection_destroy(fc);
+            connection_destroy(sc);
+            http_fastcgi_destroy(fcgi);
+            http_request_destroy(r);
+            return;
+        }
+
+        if (YHTTP_BLOCK == wrn) {
+            yhttp_debug2("send res_buffer return YHTTP_BLOCK\n");
+            connection_pause(sc, EVENT_WRITE);
+            connection_revert(fc, EVENT_READ);
+            return;
+        }
+
+        b->pos += wrn;
+
+        if (b->pos == b->last) {
+            yhttp_debug2("drain res_buffer buffer over\n");
+            if (fc->rd_eof) {
+                yhttp_debug2("send res_buffer over\n");
+                http_fastcgi_destroy(fcgi);
+                http_request_destroy(r);
+                connection_destroy(fc);
+                connection_destroy(sc);
+                return;
+            }
+            connection_pause(sc, EVENT_WRITE);
+            connection_revert(fc, EVENT_READ);
+            return;
+        }
+    }
 }
 

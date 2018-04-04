@@ -25,6 +25,7 @@
 
 static int as_deamon = 0;
 static int log = 0;
+static int dump_setting = 0;
 
 static int worker = YHTTP_WORKER_CFG;
 static pid_t works[YHTTP_WORKER_MAX];
@@ -42,6 +43,8 @@ static void help(int argc, char **argv)
            "      -d         run as daemon\n"
            "      -l path    specify the log file.\n"
            "      -v <1,2>   verbose.\n"
+           "      -z         dump settings and quit\n"
+           "      -c cfg     specify a configure file\n"
            "      -h         show this page.\n"
            "\n"
            "%s v%s\n"
@@ -58,7 +61,7 @@ static int parse_opt(int argc, char **argv, struct setting_t *setting)
     struct setting_vars *vars = &setting->vars;
     struct setting_server *ser = &setting->server;
     struct setting_static *dft_sta = (struct setting_static*)ser->map->setting;
-    while ((c = getopt(argc, argv, "r:p:dc:w:e:l:v:h")) != -1) {
+    while ((c = getopt(argc, argv, "r:p:dc:w:e:l:v:zh")) != -1) {
         switch (c) {
         case 'r':
             dft_sta->root.str = optarg;
@@ -76,6 +79,10 @@ static int parse_opt(int argc, char **argv, struct setting_t *setting)
         case 'd':
             break;
         case 'c':
+            if (YHTTP_ERROR == setting_parse(optarg, &SETTING)) {
+                yhttp_error("Configure file %s has syntax error\n", optarg);
+                return YHTTP_ERROR;
+            }
             break;
         case 'w':
             v = atoi(optarg);
@@ -94,6 +101,9 @@ static int parse_opt(int argc, char **argv, struct setting_t *setting)
             v = atoi(optarg);
             if (v > 0)
                 yhttp_log_set(LOG_INFO+v);
+            break;
+        case 'z':
+            dump_setting = 1;
             break;
         case '?':   /* error */
         case 'h':
@@ -137,7 +147,12 @@ int main(int argc, char **argv)
     if (YHTTP_OK != parse_opt(argc, argv, &SETTING))
         return 1;
 
-    /* TODO support ipv6 */
+    if (dump_setting) {
+        setting_dump(&SETTING);
+        setting_destroy(&SETTING);
+        return 0;
+    }
+
     sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (-1 == sfd) {
         yhttp_error("Master# Init socket error: %s\n", strerror(errno));
@@ -153,7 +168,6 @@ int main(int argc, char **argv)
         goto sfd_err;
     }
 
-    /* TODO reuse address for DEBUG, what is meaning? */
     if (-1 == setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)))
         yhttp_warn("Master# setsockopt: %s\n", strerror(errno));
     set_nonblock(sfd);

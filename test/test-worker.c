@@ -18,10 +18,20 @@ int sfd;
 
 int main(int argc, char **argv)
 {
-    if (argc > 1 && !strncmp("-v", argv[1], 2))
-        yhttp_log_set(LOG_DEBUG2);
-
     setting_init_default(&SETTING);
+
+    int c;
+    while ((c = getopt(argc, argv, "vc:")) != -1) {
+        switch (c) {
+        case 'v':
+            yhttp_log_set(LOG_DEBUG2);
+            break;
+        case 'c':
+            setting_parse(optarg, &SETTING);
+            setting_dump(&SETTING);
+            break;
+        }
+    }
 
     sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (-1 == sfd) {

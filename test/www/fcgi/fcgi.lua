@@ -31,7 +31,7 @@ local function hello(wsapi_env)
             "SERVER_PORT",
             "SERVER_NAME",
             "REDIRECT_STATUS",
-            "HTTP_COOKIES",
+            "HTTP_COOKIE",
         }
         coroutine.yield("<html><body>")
         coroutine.yield("<p>Hello Wsapi!</p>")
@@ -47,6 +47,22 @@ end
 local function post(wsapi_env)
     local headers = { ["Content-type"] = "text/html" }
     local function res()
+        local input = wsapi_env.input:read()
+        coroutine.yield(input)
+    end
+
+    return 200, headers, coroutine.wrap(res)
+end
+
+local function get(env)
+    local headers = {
+        ["Content-Type"] = "text/html",
+    }
+    
+    local function res()
+        local query = env['QUERY_STRING']
+        coroutine.yield("<center><p>from fcgi.lua get method</p></center>")
+        coroutine.yield(query)
     end
 
     return 200, headers, coroutine.wrap(res)
@@ -64,7 +80,7 @@ local function run_404(envs)
         coroutine.yield(str)
     end
 
-    return 200, headers, coroutine.wrap(text_404)
+    return 404, headers, coroutine.wrap(text_404)
 end
 
 local function index(envs)
@@ -82,9 +98,10 @@ local function index(envs)
 end
 
 local App = {
-    ["/hello"] = hello,
-    ["/post"]  = post,
-    ["/"] = index,
+    ["/lua/hello"] = hello,
+    ["/lua/get"]  = get,
+    ["/lua/post"]  = post,
+    ["/lua/"] = index,
 }
 
 local function run(app)

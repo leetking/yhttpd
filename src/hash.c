@@ -47,7 +47,7 @@ static int hash_find_prime(int cap)
         else
             r = m;
     }
-    /* table[r] < m <= table[l] */
+    /* table[r] < table[m] <= table[l] */
     return table[l];
 }
 

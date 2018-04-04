@@ -1,8 +1,10 @@
 # Variables of this software
 Vars {
-    #timeout = 5;
-    #accept_lock = /var/lock/yhttpd.$pid;
-    #backlog = 100;
+    timeout = 5;
+    accept_lock = /var/lock/yhttpd.$pid;
+    backlog = 100;
+    worker = 4;
+    # comment
 };
 
 # Configure a virtual host
@@ -14,24 +16,26 @@ Server {
 
     # The "GET / HTTP/1.1" is to the index
     Location / {
+        # comment
         root = /var/www;
+        # comment
         index = index.html;
     };
 
     # start with ``/statics/''
     Location /statics/* {
-        root = /var/www;
+        root = /var/www/statics;
+        # comment
+        index = foo.php;
     };
 
     # The rest are to FastCGI
     Location /* {
+        # comment
         FastCGI {
-            #server = pipe:/path/to/spawn-fcgi;
             server = unix:/tmp/fastcgi.sock;
             #server = tcp:127.0.0.1:8080;
-            #server = tcp6:127.0.0.1:8080;
-            #server = udp:127.0.0.1:8080;
+            #server = tcp6:127.0.0.2:8080;
         };
     };
 };
-

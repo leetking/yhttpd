@@ -12,6 +12,7 @@ typedef struct http_error_page_t {
 extern int http_error_page_init(char const *dir);
 extern void http_error_page_destroy();
 extern http_error_page_t const *http_error_page_get(int code);
+extern int http_error_code_support(int code);
 
 #endif
 

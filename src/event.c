@@ -65,6 +65,7 @@ extern void process_all_events()
 
     event_process_accept(&accept_events);
     event_process_posted(&posted_events);
+    /* FIXME remove it */ //sleep(1);
 }
 
 extern void event_process_expire()

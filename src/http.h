@@ -77,6 +77,7 @@ enum {
     HTTP_403 = 403,     /* Forbidden */
     HTTP_404 = 404,     /* Not Found */
     HTTP_405 = 405,     /* Method Not Allowed */
+    HTTP_406 = 406,     /* Method Not Allowed */
     HTTP_413 = 413,     /* Request Entity Too Large */
     HTTP_414 = 414,     /* Request-URI TOo Large */
     HTTP_415 = 415,     /* Unsupported Media Type */
@@ -118,7 +119,8 @@ struct http_head_com {
 struct http_head_req {
     string_t uri;
     string_t uri_params;
-    string_t suffix;
+    char suffix[SUFFIX_LEN];
+    int suffix_len;
     string_t query;
 
     string_t accept_charset;
@@ -155,7 +157,7 @@ struct http_head_res {
     string_t location;
     string_t proxy_authoricate;
     string_t proxy_after;
-    /* string_t server; */
+    string_t server;
     string_t vary;
     string_t www_authenticate;
     string_t set_cookie;    /* TODO set_cookie may be not only one field */
@@ -164,11 +166,11 @@ struct http_head_res {
 /* a request struct */
 typedef struct http_request_t {
     struct http_head_com hdr_com;           /* the common portion of head */
-    struct http_head_req hdr_req;           /* the rest head of requst */
+    struct http_head_req hdr_req;           /* the rest head of request */
     struct http_head_res hdr_res;           /* the rest head of response */
 
     buffer_t *hdr_buffer;
-    buffer_t *bdy_buffer;
+    buffer_t *ety_buffer;                   /* buffer of request entity */
     buffer_t *res_buffer;                   /* buffer of response */
     off_t pos, last;
 
@@ -182,14 +184,10 @@ typedef struct http_request_t {
     int parse_state;                    /* state of parsing */
     uint8_t hdr_type;
     uint8_t hdr_buffer_large:1;
-#define HTTP_REQUEST_BACKEND_FILE   0x01
-#define HTTP_REQUEST_BACKEND_PAGE   0x02
-#define HTTP_REQUEST_BACKEND_FCGI   0x04
-    uint8_t backend_type:3;
 } http_request_t;
 
 extern int http_init();
-extern void http_destroy();
+extern void http_exit();
 extern http_request_t *http_request_malloc();
 extern void http_request_free(http_request_t *r);
 extern void http_request_destroy(http_request_t *r);
@@ -201,9 +199,13 @@ extern int http_check_request(http_request_t *r);
 extern int http_build_response_head(http_request_t *r);
 extern void http_init_error_page(event_t *ev);
 extern void http_init_response(event_t *ev, struct setting_static *sta);
-extern void http_fastcgi_respond(event_t *ev, struct setting_fastcgi *fcgi);
 extern void http_generate_etag(string_t const *url, time_t ctime, size_t size,
         char *out, int *out_n);
+extern int http_chunk_transmit_over(char const *start, char const *end);
+extern void http_fastcgi_respond(event_t *ev, struct setting_fastcgi *fcgi);
+extern void http_fastcgi_build(http_request_t *r);
+extern void http_fastcgi_build_extend_head(http_request_t *r);
+extern int http_fastcgi_parse_response(http_request_t *r, char const *s, char const *e);
 
 typedef uint64_t http_dispatcher_t;
 extern http_dispatcher_t http_dispatch(http_request_t *r);

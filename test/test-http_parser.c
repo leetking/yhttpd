@@ -24,7 +24,7 @@ static void test_http10(void)
     t = mktime(&tm);
 
     printf("Test http request http/1.0\n");
-    char reqstr[] = "GET http://example.com:8080/url.html HTTP/1.0"CRLF
+    char reqstr[] = "GET http://example.com:8080/url.zip HTTP/1.0"CRLF
                     "From: leetking@test.com"CRLF
                     "If-Modified-Since: Sun, 25 Feb 2018 01:32:02 GMT"CRLF       /* 304 Not Modified */
                     /* Send from the server "Last-Modified: Sat, 12 Oct 1999 21:23:23 GMT"CRLF */
@@ -49,7 +49,7 @@ static void test_http10(void)
 
     assert(YHTTP_OK == http_parse_request_head(r, reqstr, reqstr+SSTR_LEN(reqstr)));
     assert(HTTP_GET == req->method);
-    assert(0 == strncmp("/url.html", req->uri.str, req->uri.len));
+    assert(0 == strncmp("/url.zip", req->uri.str, req->uri.len));
     assert(HTTP10 == com->version);
     assert(0 == strncmp("example.com", req->host.str, req->host.len));
     assert(8080 == req->port);
@@ -59,7 +59,7 @@ static void test_http10(void)
     assert(0 == strncmp("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36",
                 req->user_agent.str, req->user_agent.len));
     assert(HTTP_PRAGMA_NO_CACHE == com->pragma);
-    assert(0 == strncmp("html", req->suffix.str, req->suffix.len));
+    assert(0 == strncmp("zip", req->suffix, req->suffix_len));
 
     assert(!com->connection);
 

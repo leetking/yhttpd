@@ -15,7 +15,7 @@
 #define YHTTP_WORKER_CFG            (2)
 #define YHTTP_TIMEOUT_CFG           (5*1000)        /* 5 s */
 #define YHTTP_EVENT_INTERVAL_CFG    (1*1000)        /* 1 s */
-#define YHTTP_BACKLOG_CFG           SOMAXCONN
+#define YHTTP_BACKLOG_CFG           (511)
 
 #define YHTTP_CACHE_MAX_AGE_CFG      (3600)
 #define YHTTP_BUFFER_SIZE_CFG        (4096)
@@ -29,14 +29,12 @@ struct setting_static {
     string_t index; /* FIXME index is a list */
 };
 struct setting_fastcgi {
-    string_t server;
-#define YHTTP_SETTING_FASTCGI_PIPE  1
-#define YHTTP_SETTING_FASTCGI_UNIX  2
-#define YHTTP_SETTING_FASTCGI_TCP   3
-#define YHTTP_SETTING_FASTCGI_UDP   4
+#define YHTTP_SETTING_FASTCGI_TCP    1
+#define YHTTP_SETTING_FASTCGI_TCP6   2
+#define YHTTP_SETTING_FASTCGI_UNIX   3
     uint16_t scheme;
-    string_t host;
     uint16_t port;
+    string_t host;
 };
 
 struct setting_server_map {
@@ -62,6 +60,7 @@ struct setting_vars {
     int event_interval;
     int timeout;
     int backlog;
+    string_t accept_lock;
 };
 
 struct setting_t {
@@ -73,6 +72,7 @@ extern struct setting_t SETTING;
 
 extern int setting_parse(char const *file, struct setting_t *setting);
 extern int setting_init_default(struct setting_t *setting);
+extern int setting_dump(struct setting_t *setting);
 extern int setting_destroy(struct setting_t *setting);
 
 #endif

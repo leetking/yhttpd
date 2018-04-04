@@ -1,8 +1,12 @@
 #ifndef FASTCGI_H__
 #define FASTCGI_H__
 
-#include "setting.h"
 #include <stdint.h>
+
+#include "buffer.h"
+#include "connection.h"
+#include "setting.h"
+
 
 #define FCGI_LISTENSOCK_FILENO   0
 
@@ -30,8 +34,8 @@ typedef struct {
     uint8_t paddingLength;
     uint8_t reversed;
 } FCGI_Header;
+#define FCGI_HEADER_LEN 8   /* sizeof(FCGI_Header) */
 
-#define FCGI_HEADER_LEN 8   /* sizeof(fcgihdr_t) */
 typedef struct {
 #define FCGI_RESPONDER  1
 #define FCGI_AUTHORIZER 2
@@ -83,21 +87,33 @@ typedef struct {
     FCGI_UnknownTypeBody body;
 } FCGI_UnknownTypeRecord;
 
-#include "buffer.h"
-#include "connection.h"
+#define FCGI_RECORD_MAXLEN  ((int)0xffff)
+#define FCGI_PADDING_MAXLEN (8)
+
+#define HTTP_FASTCGI_PARSE_INIT     0
+#define HTTP_FASTCGI_EXTEND_MAX     10
 
 typedef struct {
-    buffer_t *req_buffer;
+    uint16_t request_id;
     buffer_t *res_buffer;
+    connection_t *fastcgi_con;
+    string_t extend_hdr[HTTP_FASTCGI_EXTEND_MAX];
+    int extend_hdr_idx;
+    uint8_t hdr_pos;
+    uint8_t block_padding_size;
+    uint16_t block_pos;
+    uint16_t block_size;
+    unsigned read_body:1;
+    unsigned read_padding:1;
 
-    connection_t *requst_con;
+    char *parse_pos;
+    int hdr_type;
+    int parse_state;
 } http_fastcgi_t;
 
 extern connection_t *fastcgi_connection_get(struct setting_fastcgi *fcgi);
-extern http_fastcgi_t *http_fastcgi_init();
-extern int http_fastcgi_parse_response();
-extern void http_fastcgi_build_th();
-extern void http_fastcgi_build_bh();
+extern int http_fastcgi_init(http_fastcgi_t *fcgi);
+extern void http_fastcgi_destroy(http_fastcgi_t *fcgi);
 
-#endif
+#endif /* FASTCGI_H__ */
 

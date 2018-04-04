@@ -4,7 +4,7 @@
 #include "http_time.h"
 #include "http_error_page.h"
 
-http_error_page_t pages[] = {
+static http_error_page_t pages[] = {
     {HTTP_200, "200", string_newstr("200 OK"), },
     {HTTP_202, "202", string_newstr("202 Accept"), },
     {HTTP_206, "206", string_newstr("206 Partial Content"), },
@@ -16,6 +16,7 @@ http_error_page_t pages[] = {
     {HTTP_403, "403", string_newstr("403 Forbidden"), },
     {HTTP_404, "404", string_newstr("404 Not Found"), },
     {HTTP_405, "405", string_newstr("405 Method Not Allowed"), },       /* HTTP/1.1 */
+    {HTTP_406, "406", string_newstr("406 Not Acceptable, Unsupport Chunked"), },       /* HTTP/1.1 */
     {HTTP_413, "413", string_newstr("413 Request Entity Too Large"), },
     {HTTP_414, "414", string_newstr("414 Request-URI Too Large"), },
     {HTTP_415, "415", string_newstr("415 Unsupported Media Type"), },
@@ -83,4 +84,20 @@ extern http_error_page_t const *http_error_page_get(int code)
     }
     BUG_ON("code is not in the range");
     return NULL;
+}
+
+extern int http_error_code_support(int code)
+{
+    int l = 0, m, r = ARRSIZE(pages);
+    while (l < r) {
+        m = (l+r)/2;
+        if (pages[m].code == code)
+            return 1;
+        if (pages[m].code < code)
+            l = m+1;
+        else
+            r = m;
+    }
+
+    return 0;
 }

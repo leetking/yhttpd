@@ -331,6 +331,11 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
     case HDR_TRAILER:
         break;
     case HDR_TRANSFER_ENCODING:
+        if (0 == strncmp("chunked", start, SSTR_LEN("chunked"))) {
+            com->transfer_encoding = HTTP_CHUNKED;
+            break;
+        }
+        return YHTTP_ERROR;
         break;
     case HDR_UPGRADE:
         break;
@@ -429,23 +434,6 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
         return YHTTP_ERROR;
     }
     return YHTTP_AGAIN;
-}
-
-static void http_parse_file_suffix(http_request_t *r, char const *start, char const *end)
-{
-#define SUFFIX_LEN 5
-    struct http_head_req *req = &r->hdr_req;
-    req->suffix.str = NULL;
-    req->suffix.len = 0;
-    if (start < end-SUFFIX_LEN)
-        start = end-SUFFIX_LEN;
-    for (; start < end; start++) {
-        if ('.' == *start) {
-            req->suffix.str = start+1;
-            req->suffix.len = end-start-1;
-            return;
-        }
-    }
 }
 
 /**
@@ -660,7 +648,6 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
             if (' ' == *p || '?' == *p || ';' == *p) {
                 req->uri.str = pos;
                 req->uri.len = p-pos;
-                http_parse_file_suffix(r, pos, p);
 
                 switch (*p) {
                 case ' ':
@@ -850,3 +837,21 @@ extern void http_parse_destroy()
 {
     hash_destroy(&ENV.hdr_fields);
 }
+
+extern void http_parse_file_suffix(http_request_t *r, char const *start, char const *end)
+{
+    struct http_head_req *req = &r->hdr_req;
+    req->suffix[0] = '\0';
+    req->suffix_len = 0;
+    if (start < end-SUFFIX_LEN)
+        start = end-SUFFIX_LEN;
+    for (; start < end; start++) {
+        if ('.' == *start) {
+            while (++start < end)
+                req->suffix[req->suffix_len++] = *start;
+            return;
+        }
+    }
+}
+
+

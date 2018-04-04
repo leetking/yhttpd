@@ -7,7 +7,7 @@ static struct env {
 
 extern int http_mime_init()
 {
-    ENV.mimes = hash_create(20, NULL, NULL);
+    ENV.mimes = hash_create(40, NULL, NULL);
     if (!ENV.mimes)
         return YHTTP_ERROR;
     for (int i = MIME_INVALID; i < MIME_ID_MAX; i++) {
@@ -60,6 +60,10 @@ extern int http_mime_init()
             break;
         }
     }
+
+    for (intptr_t i = MIME_TEXT_HTML; i < MIME_ID_MAX; i++)
+        hash_add(ENV.mimes, http_mimes[i].str, http_mimes[i].len, (void*)i);
+
     return YHTTP_OK;
 }
 
@@ -78,3 +82,9 @@ extern int http_mime_get(char const *suffix, size_t len)
     return (int)vlu;
 }
 
+extern int http_mime_to_digit(char const *start, char const *end)
+{
+    if (end <= start)
+        return MIME_APPLICATION_OCTET_STREAM;
+    return http_mime_get(start, end-start);
+}

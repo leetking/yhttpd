@@ -18,6 +18,7 @@ enum {
     MIME_AUDIO_OGG,
     MIME_VIDEO_OGG,
     MIME_TEXT_PLAIN,
+    MIME_APPLICATION_X_WWW_FORM_URLENCODED,
     MIME_APPLICATION_OCTET_STREAM,
 
     MIME_ID_MAX,
@@ -38,11 +39,13 @@ static string_t http_mimes[] = {
     string_newstr("audio/ogg"),         /* oga */
     string_newstr("video/ogg"),         /* ogv */
     string_newstr("text/plain"),                /* default textual stream */
+    string_newstr("application/x-form-urlencoded"),
     string_newstr("application/octet-stream"),  /* default binary stream */
 };
 
 extern int http_mime_init();
 extern void http_mime_destroy();
 extern int http_mime_get(char const *suffix, size_t len);
+extern int http_mime_to_digit(char const *start, char const *end);
 
 #endif

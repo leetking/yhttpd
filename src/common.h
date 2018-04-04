@@ -9,6 +9,7 @@
 
 #define BUFF_SIZE           (2048)
 #define CPU_ID_MAX          (2)
+#define SUFFIX_LEN          5
 
 #define MAX(x, y)       ((x)>(y)? (x): (y))
 #define MIN(x, y)       ((x)<(y)? (x): (y))
@@ -65,6 +66,14 @@ void bug_on(void);
 } while (0)
 #else
 # define BUG_ON(exp)    ((void)0)
-#endif
+#endif /* YHTTP_DEBUG */
+
+#ifdef __GNUC__
+# define likely(exp)       __builtin_expect(!!(exp), 1)
+# define unlikely(exp)     __builtin_expect(!!(exp), 0)
+#else
+# define likely(exp)     (exp)
+# define unlikely(exp)   (exp)
+#endif /* __GNUC__ */
 
 #endif /* COMMON_H__ */

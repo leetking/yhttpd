@@ -73,6 +73,30 @@ extern void connection_revert(connection_t *c, int event)
 
 extern void connection_event_add(connection_t *c, int event, event_t *ev)
 {
+    BUG_ON(NULL == c);
+    switch (event) {
+    case EVENT_READ:
+        BUG_ON(c->rd);
+        BUG_ON(c->rd_enable);
+        c->rd = 1;
+        c->rd_enable = 0;
+        c->ev = ev;
+        break;
+    case EVENT_WRITE:
+        BUG_ON(c->wr);
+        BUG_ON(c->wr_enable);
+        c->wr = 1;
+        c->wr_enable = 0;
+        c->ev = ev;
+        break;
+    default:
+        BUG_ON("unkown event type");
+        break;
+    }
+}
+
+extern void connection_event_add_now(connection_t *c, int event, event_t *ev)
+{
     int s = 0;
     BUG_ON(NULL == c);
     switch (event) {
@@ -106,17 +130,19 @@ extern event_t *connection_event_del(connection_t *c, int event)
     switch (event) {
     case EVENT_READ:
         BUG_ON(!c->rd);
-        c->rd = 0;
-        c->rd_enable = 0;
-        s = event_del(c->ev, EVENT_READ);
+        if (c->rd_enable)
+            s = event_del(c->ev, EVENT_READ);
         if (c->ev->timeout_set)
             event_del_timer(c->ev);
+        c->rd = 0;
+        c->rd_enable = 0;
         break;
     case EVENT_WRITE:
         BUG_ON(!c->wr);
+        if (c->wr_enable)
+            s = event_del(c->ev, EVENT_WRITE);
         c->wr = 0;
         c->wr_enable = 0;
-        s = event_del(c->ev, EVENT_WRITE);
         break;
     default:
         BUG_ON("unkown event type");
@@ -143,13 +169,15 @@ extern void connection_destroy(connection_t *c)
     int nedd_free = 0;
 
     BUG_ON(NULL == c);
+    BUG_ON(c->rd && c->wr);
+    BUG_ON(c->rd_enable && c->wr_enable);
 
-    if (c->rd) {
+    if (c->rd_enable) {
         if (c->ev->timeout_set)
             event_del_timer(c->ev);
         event_del(c->ev, EVENT_READ);
         nedd_free = 1;
-    } else if (c->wr) {
+    } else if (c->wr_enable) {
         event_del(c->ev, EVENT_WRITE);
         nedd_free = 1;
     }

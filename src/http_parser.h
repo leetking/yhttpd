@@ -6,6 +6,7 @@
 #define HTTP_PARSE_INIT 0
 
 int http_parse_request_head(http_request_t *req, char *start, char *end);
+void http_parse_file_suffix(http_request_t *r, char const *start, char const *end);
 int http_parse_init();
 void http_parse_destroy();
 

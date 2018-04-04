@@ -25,7 +25,10 @@ extern void connection_free(connection_t *c);
 
 extern void connection_revert(connection_t *c, int event);
 extern void connection_pause(connection_t *c, int event);
+/* add but pause */
 extern void connection_event_add(connection_t *c, int event, event_t *ev);
+/* add and active */
+extern void connection_event_add_now(connection_t *c, int event, event_t *ev);
 extern event_t *connection_event_del(connection_t *c, int event);
 extern void connection_read_timeout(connection_t *c, msec_t ts);
 extern void connection_destroy(connection_t *c);
