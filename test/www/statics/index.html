@@ -7,13 +7,16 @@
 <body>
   <h1>Hello World!</h1>
 
-  <form action="/post" method="post">
-    Name: <input name="name" type="text" /><br />
-    Age: <input name="age" type="text" /><br />
-    <input type="submit" value="Submit" />
-  </form>
-  <p><a href="/hello">FastCGI</a></p>
-  <p><a href="page2.html">Page2</a></p>
-  <img src="imgs/test.png" />
+  <h2>0. 测试静态页面</h2>
+  <p><a href="/">静态页面</a></p>
+
+  <h2>1. 测试 FastCGI for Lua</h2>
+  <p><a href="/lua/">index of lux</a></p>
+
+  <h2>2. 测试 FastCGI for python</h2>
+  <p><a href="/python/">index of python</a></p>
+
+  <h2>3. 测试 FastCGI for ruby</h2>
+  <p><a href="/ruby/">index of ruby</a></p>
 </body>
 </html>

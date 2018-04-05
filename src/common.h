@@ -7,7 +7,6 @@
 #include <stddef.h>
 #include <unistd.h>
 
-#define BUFF_SIZE           (2048)
 #define CPU_ID_MAX          (2)
 #define SUFFIX_LEN          5
 
@@ -69,8 +68,8 @@ void bug_on(void);
 #endif /* YHTTP_DEBUG */
 
 #ifdef __GNUC__
-# define likely(exp)       __builtin_expect(!!(exp), 1)
-# define unlikely(exp)     __builtin_expect(!!(exp), 0)
+# define likely(exp)     __builtin_expect(!!(exp), 1)
+# define unlikely(exp)   __builtin_expect(!!(exp), 0)
 #else
 # define likely(exp)     (exp)
 # define unlikely(exp)   (exp)

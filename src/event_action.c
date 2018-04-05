@@ -186,7 +186,7 @@ extern void event_parse_http_head(event_t *sev)
             rb = r->hdr_buffer;
         }
 
-        state = http_parse_request_head(r, r->parse_pos, rb->last);
+        state = http_parse_request_head(r, r->parse_p, rb->last);
         if (state == YHTTP_ERROR) {
             yhttp_debug("Http parse request error\n");
             sev = connection_event_del(c, EVENT_READ);
@@ -214,6 +214,7 @@ extern void event_parse_http_head(event_t *sev)
                 return;
             }
 
+            http_print_request(r);
             /* url route */
             for (url_map = ser->map; url_map; url_map = url_map->next) {
                 if (YHTTP_OK == http_wildcard_match(req->uri.str, req->uri.len,
@@ -438,8 +439,8 @@ extern void http_init_response(event_t *sev, struct setting_static *sta)
     if (1 == req->uri.len && '/' == req->uri.str[0])
         fname = &sta->index;
 
-    uri_len = snprintf(uri, PATH_MAX, "%.*s/%.*s",
-            sta->root.len, sta->root.str, fname->len, fname->str);
+    uri_len = snprintf(uri, PATH_MAX, "%s/%.*s/%.*s",
+            SETTING.cwd, sta->root.len, sta->root.str, fname->len, fname->str);
 
     yhttp_debug2("uri: %s\n", uri);
     if (-1 == stat(uri, st)) {
@@ -521,7 +522,7 @@ extern void http_fastcgi_respond(event_t *sev, struct setting_fastcgi *setting_f
         return;
     }
 
-    r->hdr_buffer->pos = r->parse_pos;
+    r->hdr_buffer->pos = r->parse_p;
     r->pos = buffer_len(r->hdr_buffer);
     r->last = com->content_length;
     if (r->pos >= r->last)
@@ -837,7 +838,9 @@ extern void event_read_fcgi_packet_hdr(event_t *fev)
                 *r->res_buffer->last++ = LF;
                 *r->res_buffer->last++ = CR;
                 *r->res_buffer->last++ = LF;
-                connection_pause(fc, EVENT_READ);
+                fev = connection_event_del(fc, EVENT_READ);
+                BUG_ON(fev->data != fc);
+                event_free(fev);
                 connection_revert(sc, EVENT_WRITE);
                 return;
             }
@@ -932,7 +935,7 @@ extern void event_read_fcgi_packet_bdy(event_t *fev)
 
                     http_build_response_head(r);
                     http_fastcgi_build_extend_head(r);
-                    b->pos = fcgi->parse_pos;
+                    b->pos = fcgi->parse_p;
                     r->res_buffer->last += (hex_len(buffer_len(b))+2);
                     buffer_copy(r->res_buffer, b);
                     chunk_data(r->res_buffer->last - buffer_len(b), buffer_len(b));

@@ -4,7 +4,7 @@ CURRENT_PATH=`pwd`
 
 FCGI_PATH=$CURRENT_PATH/fcgi
 
-#LISTENING=/tmp/fcgi.socket
+#LISTENING=/tmp/fcgi.lua.socket
 LISTENING=127.0.0.1:8081
 
 LUA_FCGI=fcgi.lua

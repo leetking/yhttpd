@@ -106,6 +106,7 @@ typedef struct {
     unsigned read_body:1;
     unsigned read_padding:1;
 
+    char *parse_p;
     char *parse_pos;
     int hdr_type;
     int parse_state;

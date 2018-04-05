@@ -15,8 +15,8 @@ LDFLAGS_DEBUG   := -fsanitize=address -rdynamic
 CFLAGS_RELEASE  := -O2 -DNDEBUG -g -Wall -Werror
 LDFLAGS_RELEASE :=
 
-CFLAGS  += $(CFLAGS_DEBUG)
-LDFLAGS += $(LDFLAGS_DEBUG)
+CFLAGS  += $(CFLAGS_RELEASE)
+LDFLAGS += $(LDFLAGS_RELEASE)
 
 SRCS := $(sort $(wildcard *.c))
 DEPS := $(SRCS:.c=.c.d)

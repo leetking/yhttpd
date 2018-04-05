@@ -177,7 +177,7 @@ static int http_parse_encoding(char const *str, char const *end)
 
     unsigned int ret = HTTP_IDENTITY;
 
-    char const *pos;
+    char const *pos = str;
     char const *p;
     int state = ps_init;
     for (p = str; p < end; p++) {
@@ -470,13 +470,13 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
     char *p;
 
 #define return_error(c)   do { \
-    r->parse_pos = p; \
+    r->parse_pos = pos; \
+    r->parse_p = p; \
     res->code = (c); \
     return YHTTP_ERROR; \
 } while (0)
 
-    if (r->parse_pos == NULL)
-        pos = start;
+    pos = r->parse_p? r->parse_pos: start;
     for (p = start; p < end; p++) {
         switch (r->parse_state) {
         case PS_START:
@@ -803,7 +803,8 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
 
         case PS_END:
             if (LF == *p) {
-                r->parse_pos = p+1;
+                r->parse_pos = pos;
+                r->parse_p = p+1;
                 res->code = HTTP_200;
                 return YHTTP_OK;
             }
@@ -816,7 +817,8 @@ extern int http_parse_request_head(http_request_t *r, char *start, char *end)
         }
     }
 
-    r->parse_pos = end;
+    r->parse_pos = pos;
+    r->parse_p = end;
     return YHTTP_AGAIN;
 }
 

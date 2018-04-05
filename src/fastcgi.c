@@ -29,6 +29,25 @@ static struct env {
     int solved;
 } ENV;
 
+string_t http_mimes[] = {
+    string_null,
+    string_newstr("text/html"),
+    string_newstr("text/css"),
+    string_newstr("text/x-c"),
+    string_newstr("text/javascript"),
+    string_newstr("font/tff"),
+    string_newstr("font/woff"),
+    string_newstr("application/xml"),
+    string_newstr("image/jpeg"),
+    string_newstr("image/png"),
+    string_newstr("audio/mpeg3"),
+    string_newstr("audio/ogg"),         /* oga */
+    string_newstr("video/ogg"),         /* ogv */
+    string_newstr("text/plain"),                /* default textual stream */
+    string_newstr("application/x-form-urlencoded"),
+    string_newstr("application/octet-stream"),  /* default binary stream */
+};
+
 enum {
     HDR_STATUS,
     HDR_SET_COOKIE,
@@ -132,7 +151,7 @@ extern int http_fastcgi_init(http_fastcgi_t *fcgi)
         return YHTTP_ERROR;
     fcgi->request_id = 1;
     fcgi->extend_hdr_idx = 0;
-    fcgi->parse_pos = NULL;
+    fcgi->parse_p = NULL;
     fcgi->parse_state = HTTP_FASTCGI_PARSE_INIT;
     return YHTTP_OK;
 }
@@ -216,6 +235,7 @@ extern int http_fastcgi_parse_response(http_request_t *r, char const *start, cha
     http_fastcgi_t *fcgi = &r->backend.fcgi;
     char const *pos;
     char const *p;
+    pos = fcgi->parse_p? fcgi->parse_pos: start;
     for (p = start; p < end; p++) {
         switch (fcgi->parse_state) {
         case PS_START:
@@ -289,7 +309,8 @@ extern int http_fastcgi_parse_response(http_request_t *r, char const *start, cha
             return YHTTP_ERROR;
         case PS_END:
             if (LF == *p) {
-                fcgi->parse_pos = (char*)p+1;
+                fcgi->parse_pos = (char*)pos;
+                fcgi->parse_p = (char*)p+1;
                 return YHTTP_OK;
             }
             return YHTTP_ERROR;
@@ -299,7 +320,8 @@ extern int http_fastcgi_parse_response(http_request_t *r, char const *start, cha
         }
     }
 
-    fcgi->parse_pos = (char*)p;
+    fcgi->parse_pos = (char*)pos;
+    fcgi->parse_p = (char*)p;
     return YHTTP_AGAIN;
 }
 

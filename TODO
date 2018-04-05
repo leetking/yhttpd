@@ -1,5 +1,5 @@
-* 调试 和 性能分析, 改进锁的实现
 * 负载均衡
+* 性能分析, 改进锁的实现
 
 * 实现 poll 和 epoll 并对比性能测试
 * url 和 referer 的长度限制
@@ -14,10 +14,11 @@
 
 已经完成
 --------
++ 支持 FastCGI 和 chunked 回应
 + 实现配置文件解析和加载
 + 不实现 chunked 模式下的上传到 FastCGI，但是 content_length 的上传支持
 + 实现 HTTP/1.0 的特征
-* 实现 HTTP/1.1 的部分特征
++ 实现 HTTP/1.1 的部分特征
 + Range 属于 HTTP/1.1，已经实现
 + Etag 和 If-None-Match 和 Cache-Control
 + 支持 If-Modified-Since 和 304

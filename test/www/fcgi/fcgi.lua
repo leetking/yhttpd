@@ -1,72 +1,7 @@
 #!/usr/bin/env lua
 
 local fastcgi = require("wsapi.fastcgi")
-
-local function hello(wsapi_env)
-    local headers = {
-        ["Content-type"] = "text/html",
-        ["Set-Cookies"] = "Cookie-is-from-fcgi.lua=1",
-        ["Server"] = "fcgi.lua",
-    }
-
-    local function hello_text()
-        local envs = {
-            "PATH_INFO",
-            "SCRIPT_NAME",
-            "SCRIPT_FILENAME",
-            "QUERY_STRING",
-            "REQUEST_METHOD",
-            "CONTENT_TYPE",
-            "CONTENT_LENGTH",
-            "REQEUST_URI",
-            "DOCUMENT_URI",
-            "DOCUMENT_ROOT",
-            "SERVER_PROTOCOL",
-            "REQUEST_SCHEME",
-            "GATEWAY_INTERFACE",
-            "SERVER_SOFTWARE",
-            "REMOTE_ADDR",
-            "REMOTE_PORT",
-            "SERVER_ADDR",
-            "SERVER_PORT",
-            "SERVER_NAME",
-            "REDIRECT_STATUS",
-            "HTTP_COOKIE",
-        }
-        coroutine.yield("<html><body>")
-        coroutine.yield("<p>Hello Wsapi!</p>")
-        for _, v in pairs(envs) do
-            coroutine.yield(("<p>%s: %s</p>"):format(v, wsapi_env[v]))
-        end
-        coroutine.yield("</body></html>")
-    end
-
-    return 200, headers, coroutine.wrap(hello_text)
-end
-
-local function post(wsapi_env)
-    local headers = { ["Content-type"] = "text/html" }
-    local function res()
-        local input = wsapi_env.input:read()
-        coroutine.yield(input)
-    end
-
-    return 200, headers, coroutine.wrap(res)
-end
-
-local function get(env)
-    local headers = {
-        ["Content-Type"] = "text/html",
-    }
-    
-    local function res()
-        local query = env['QUERY_STRING']
-        coroutine.yield("<center><p>from fcgi.lua get method</p></center>")
-        coroutine.yield(query)
-    end
-
-    return 200, headers, coroutine.wrap(res)
-end
+local app = require("lua_fcgi.app")
 
 local function run_404(envs)
     local headers = { ["Content-type"] = "text/html" }
@@ -83,26 +18,6 @@ local function run_404(envs)
     return 404, headers, coroutine.wrap(text_404)
 end
 
-local function index(envs)
-    local headers = { ["Content-type"] = "text/html" }
-    local str = [[
-    <html>
-    <meta http-equiv="refresh" content="0;url=/statics/index.html">
-    </html>
-    ]]
-    local function text_index()
-        coroutine.yield(str)
-    end
-
-    return 200, headers, coroutine.wrap(text_index)
-end
-
-local App = {
-    ["/lua/hello"] = hello,
-    ["/lua/get"]  = get,
-    ["/lua/post"]  = post,
-    ["/lua/"] = index,
-}
 
 local function run(app)
     fastcgi.run(function (envs)
@@ -115,5 +30,5 @@ local function run(app)
 end
 
 -- GO!
-run(App)
+run(app)
 

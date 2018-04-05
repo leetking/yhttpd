@@ -45,6 +45,7 @@ extern void connection_pause(connection_t *c, int event)
         break;
     }
     BUG_ON(s != 0);
+    (void)s;
 }
 
 extern void connection_revert(connection_t *c, int event)
@@ -69,6 +70,7 @@ extern void connection_revert(connection_t *c, int event)
         break;
     }
     BUG_ON(s != 0);
+    (void)s;
 }
 
 extern void connection_event_add(connection_t *c, int event, event_t *ev)
@@ -121,6 +123,7 @@ extern void connection_event_add_now(connection_t *c, int event, event_t *ev)
         break;
     }
     BUG_ON(s != 0);
+    (void)s;
 }
 
 extern event_t *connection_event_del(connection_t *c, int event)
@@ -149,6 +152,7 @@ extern event_t *connection_event_del(connection_t *c, int event)
         break;
     }
     BUG_ON(s != 0);
+    (void)s;
     return c->ev;
 }
 

@@ -11,17 +11,7 @@ Usage
 
   $ ./yhttp -h
 
-The default structure of ``www`` directory is shown as below.
-
-.. code-block:: text
-
-  www/
-  |-- err-codes/
-  |   +-- 404.html    # etc.
-  |-- cgi-bin/
-  |   +-- dopost.lua
-  |
-  +-- index.html      # normal file
+The default configuration of ``yhttpd`` is dumped by ``./yhttpd -z``
 
 Thanks
 ------

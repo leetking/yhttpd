@@ -77,7 +77,7 @@ enum {
     HTTP_403 = 403,     /* Forbidden */
     HTTP_404 = 404,     /* Not Found */
     HTTP_405 = 405,     /* Method Not Allowed */
-    HTTP_406 = 406,     /* Method Not Allowed */
+    HTTP_406 = 406,     /* Not Acceptable, Unsupport Chunked */
     HTTP_413 = 413,     /* Request Entity Too Large */
     HTTP_414 = 414,     /* Request-URI TOo Large */
     HTTP_415 = 415,     /* Unsupported Media Type */
@@ -124,19 +124,19 @@ struct http_head_req {
     string_t query;
 
     string_t accept_charset;
-    string_t authorization;
-    string_t expect;
+    //string_t authorization;
+    //string_t expect;
     string_t from;
     string_t host;
     time_t if_modified_since;
     string_t if_none_match;
-    string_t if_range;
+    //string_t if_range;
     time_t if_unmodified_since;
-    int max_forwards;
+    //int max_forwards;
     int range1, range2;
-    string_t proxy_authorication;
+    //string_t proxy_authorication;
     string_t referer;
-    string_t te;
+    //string_t te;
     string_t user_agent;
     string_t cookie;
     string_t origin;
@@ -151,15 +151,15 @@ struct http_head_req {
 struct http_head_res {
     int16_t code;
 
-    string_t accept_ranges;
-    int age;
+    //string_t accept_ranges;
+    //int age;
     char etag[HTTP_ETAG_LEN+1];
     string_t location;
-    string_t proxy_authoricate;
-    string_t proxy_after;
+    //string_t proxy_authoricate;
+    //string_t proxy_after;
     string_t server;
-    string_t vary;
-    string_t www_authenticate;
+    //string_t vary;
+    //string_t www_authenticate;
     string_t set_cookie;    /* TODO set_cookie may be not only one field */
 };
 
@@ -180,7 +180,8 @@ typedef struct http_request_t {
         http_fastcgi_t fcgi;
     } backend;
 
-    char *parse_pos;                    /* current position at the buffer */
+    char *parse_p;                      /* current position at the buffer */
+    char *parse_pos;
     int parse_state;                    /* state of parsing */
     uint8_t hdr_type;
     uint8_t hdr_buffer_large:1;
@@ -194,6 +195,8 @@ extern void http_request_destroy(http_request_t *r);
 extern void http_request_reuse(http_request_t *r);
 extern void http_request_init(http_request_t *r);
 extern int http_request_extend_hdr_buffer(http_request_t *r);
+
+extern void http_print_request(http_request_t *r);
 
 extern int http_check_request(http_request_t *r);
 extern int http_build_response_head(http_request_t *r);

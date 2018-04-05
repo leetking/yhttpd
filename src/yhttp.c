@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <netinet/ip.h>
 #include <fcntl.h>
@@ -23,29 +24,29 @@
 #include "setting.h"
 #include "worker.h"
 
-static int as_deamon = 0;
-static int log = 0;
-static int dump_setting = 0;
+static int dump = 0;
+static int as_daemon = 0;
+static int verbose = 0;
 
-static int worker = YHTTP_WORKER_CFG;
 static pid_t works[YHTTP_WORKER_MAX];
 static int64_t alive = 0;
 static char quit = 0;
 
 static void help(int argc, char **argv)
 {
+    (void)argc;
     printf("Usage: %s [OPTIONS]\n"
            "a simple but powerful http server, just for studing.\n"
            "OPTIONS:\n"
-           "      -r path    set `www` directory, default current directory(.)\n"
-           "      -p num     port\n"
-           "      -w num     create num number worker process.\n"
+           "      -r path    set `root` directory, default current directory(.)\n"
+           "      -p num     listening port\n"
+           "      -w num     number of spawning worker process\n"
+           "      -l path    specify a log file\n"
            "      -d         run as daemon\n"
-           "      -l path    specify the log file.\n"
-           "      -v <1,2>   verbose.\n"
-           "      -z         dump settings and quit\n"
-           "      -c cfg     specify a configure file\n"
-           "      -h         show this page.\n"
+           "      -v <1,2>   verbose\n"
+           "      -z         dump settings and quit, if no configuration file, dump default configuration\n"
+           "      -c cfg     specify a configuration file\n"
+           "      -h         show this page\n"
            "\n"
            "%s v%s\n"
            "(C) GPL v3\n"
@@ -55,13 +56,13 @@ static void help(int argc, char **argv)
 
 static int parse_opt(int argc, char **argv, struct setting_t *setting)
 {
-    int ret = 0;
+    int ret = YHTTP_OK;
     int c;
     int v;
     struct setting_vars *vars = &setting->vars;
     struct setting_server *ser = &setting->server;
     struct setting_static *dft_sta = (struct setting_static*)ser->map->setting;
-    while ((c = getopt(argc, argv, "r:p:dc:w:e:l:v:zh")) != -1) {
+    while ((c = getopt(argc, argv, "r:p:w:l:dv:zc:h")) != -1) {
         switch (c) {
         case 'r':
             dft_sta->root.str = optarg;
@@ -71,18 +72,10 @@ static int parse_opt(int argc, char **argv, struct setting_t *setting)
         case 'p':
             v = atoi(optarg);
             if (0 == v)
-                yhttp_info("Master# the port is invalid\n");
+                yhttp_info("Master# the port is invalid, use the default port 80\n");
             else
                 ser->port = v;
             yhttp_debug2("Master# listening at port: %d\n", ser->port);
-            break;
-        case 'd':
-            break;
-        case 'c':
-            if (YHTTP_ERROR == setting_parse(optarg, &SETTING)) {
-                yhttp_error("Configure file %s has syntax error\n", optarg);
-                return YHTTP_ERROR;
-            }
             break;
         case 'w':
             v = atoi(optarg);
@@ -90,30 +83,51 @@ static int parse_opt(int argc, char **argv, struct setting_t *setting)
                 yhttp_info("Master# the count of worker is invalid\n");
             else
                 vars->worker = MIN(v, YHTTP_WORKER_MAX);
-            worker = vars->worker;
             yhttp_debug2("Master# the count of worker : %d\n", vars->worker);
             break;
-        case 'e':
-            break;
         case 'l':
+            vars->log.str = optarg;
+            vars->log.len = strlen(optarg);
+            yhttp_debug2("Master# log file: %.*s\n", vars->log.len, vars->log.str);
+            break;
+        case 'd':
+            as_daemon = 1;
             break;
         case 'v':
             v = atoi(optarg);
             if (v > 0)
-                yhttp_log_set(LOG_INFO+v);
+                verbose = v;
             break;
         case 'z':
-            dump_setting = 1;
+            dump = 1;
+            break;
+        case 'c':
+            if (YHTTP_ERROR == setting_parse(optarg, &SETTING)) {
+                yhttp_error("Configure file %s has syntax error\n", optarg);
+                return YHTTP_ERROR;
+            }
             break;
         case '?':   /* error */
         case 'h':
         default:
             help(argc, argv);
-            ret = -1;
+            ret = YHTTP_ERROR;
             break;
         }
     }
     return ret;
+}
+
+static void run_as_daemon(void)
+{
+    pid_t pid;
+    umask(0);
+    pid = fork();
+
+    /* exit parent process */
+    if (pid != 0)
+        exit(0);
+    setsid();
 }
 
 static void kill_workers(int _)
@@ -121,7 +135,7 @@ static void kill_workers(int _)
     (void)_;
     yhttp_debug2("Master# catch SIGINT, quit.\n");
     quit = 1;
-    for (int i = 0; i < worker; i++)
+    for (int i = 0; i < SETTING.vars.worker; i++)
         kill(works[i], SIGINT);
 }
 
@@ -143,15 +157,25 @@ int main(int argc, char **argv)
         yhttp_error("A fatal error in initial phase\n Quit\n");
         return 1;
     }
-
     if (YHTTP_OK != parse_opt(argc, argv, &SETTING))
         return 1;
 
-    if (dump_setting) {
+    if (dump) {
         setting_dump(&SETTING);
         setting_destroy(&SETTING);
         return 0;
     }
+    if (verbose > 0)
+        yhttp_log_set(LOG_DEBUG+verbose);
+    if (0 != strncmp("-", VARS->log.str, VARS->log.len)) {
+        char buff[PATH_MAX+1];
+        int len = MIN(VARS->log.len, PATH_MAX);
+        memcpy(buff, VARS->log.str, len);
+        buff[len] = '\0';
+        freopen(buff, "w+", stdin);
+    }
+    if (as_daemon)
+        run_as_daemon();
 
     sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (-1 == sfd) {

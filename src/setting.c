@@ -389,6 +389,7 @@ static int setting_parse_vars(char *str, char *end, struct setting_vars *vars)
 
 static int setting_parse_server_map(char *start, char *end, struct setting_server_map *new)
 {
+    struct setting_static *sta;
     enum {
         ps_init = 0,
         ps_word_bf, ps_word,
@@ -511,12 +512,14 @@ static int setting_parse_server_map(char *start, char *end, struct setting_serve
                 yhttp_debug2("value: %.*s\n", p-pos, pos);
                 switch (key_id) {
                 case SERVER_MAP_STATIC_ROOT:
-                    ((struct setting_static *)new->setting)->root.str = pos;
-                    ((struct setting_static *)new->setting)->root.len = p-pos;
+                    sta = new->setting;
+                    sta->root.str = pos;
+                    sta->root.len = p-pos;
                     break;
                 case SERVER_MAP_STATIC_INDEX:
-                    ((struct setting_static *)new->setting)->index.str = pos;
-                    ((struct setting_static *)new->setting)->index.len = p-pos;
+                    sta = new->setting;
+                    sta->index.str = pos;
+                    sta->index.len = p-pos;
                     break;
                 default:
                     BUG_ON("unkown key in parse server map static");
@@ -865,6 +868,7 @@ extern int setting_dump(struct setting_t *setting)
     printf("\tevent_interval = %d;\n", vars->event_interval);
     printf("\ttimeout = %d;\n", vars->timeout);
     printf("\twoker = %d;\n", vars->worker);
+    printf("\tlog = %.*s;\n", vars->log.len, vars->log.str);
     /* TODO finish all vars */
     printf("};\n");
     printf("Server {\n");
@@ -910,10 +914,15 @@ extern int setting_dump(struct setting_t *setting)
 extern int setting_init_default(struct setting_t *setting)
 {
     struct setting_vars *vars = &setting->vars;
+
+    getcwd(setting->cwd, PATH_MAX-1);
+    setting->cwd_len = strlen(setting->cwd);
+
     vars->worker = YHTTP_WORKER_CFG;
     vars->timeout = YHTTP_TIMEOUT_CFG;
     vars->event_interval = YHTTP_EVENT_INTERVAL_CFG;
     vars->backlog = YHTTP_BACKLOG_CFG;
+    vars->log.str = "-", vars->log.len = 1;
 
     /* default server */
     struct setting_server *ser = &setting->server;
@@ -924,8 +933,7 @@ extern int setting_init_default(struct setting_t *setting)
         yhttp_free(sta);
         return YHTTP_ERROR;
     }
-    /* ser->port = 80; */
-    /* FIXME remove it */ ser->port = 8080;
+    ser->port = 80;
     ser->user.str = "http", ser->user.len = SSTR_LEN("http");
     ser->host.str = "*", ser->host.len = 1;
     ser->error_pages.str = ".", ser->error_pages.len = 1;

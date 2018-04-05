@@ -49,7 +49,7 @@ extern void http_request_reuse(http_request_t *r)
     struct http_head_res *res = &r->hdr_res;
     buffer_init(r->hdr_buffer);
     buffer_init(r->res_buffer);
-    r->parse_pos = r->hdr_buffer->pos;
+    r->parse_p = r->hdr_buffer->pos;
     r->parse_state = HTTP_PARSE_INIT;
     req->if_modified_since = 0;     /* 1970-1-1 00:00:00 */
     req->range1 = 0;
@@ -282,6 +282,12 @@ extern int http_build_response_head(http_request_t *r)
         break;
     }
 
+    if (!string_isnull(&res->set_cookie)) {
+        len = snprintf(resb->last, buffer_rest(resb), "Set-Cookie: %.*s"CRLF,
+                res->set_cookie.len, res->set_cookie.str);
+        resb->last += len;
+    }
+
     *resb->last++ = CR;
     *resb->last++ = LF;
     yhttp_debug2("response header %d:%d\n%.*s\n",
@@ -407,20 +413,49 @@ extern int http_request_extend_hdr_buffer(http_request_t *r)
     }
     yhttp_debug("Allocate memory for http_large_buffer\n");
 
-    BUG_ON(NULL == r->parse_pos);
-    BUG_ON(r->parse_pos < r->hdr_buffer->pos);
+    BUG_ON(NULL == r->parse_p);
+    BUG_ON(r->parse_p < r->hdr_buffer->pos);
 
     r->hdr_buffer_large = 1;
     buffer_copy(b, r->hdr_buffer);
     buffer_free(r->hdr_buffer);
     r->hdr_buffer = b;
-    r->parse_pos = b->pos;
+    r->parse_p = b->pos;
     /* must REPARSE the header ... */
     return YHTTP_OK;
 }
 
 extern int http_chunk_transmit_over(char const *start, char const *end)
 {
-    /* TODO finish chunck check */
     return YHTTP_OK;
+}
+
+extern void http_print_request(http_request_t *r)
+{
+    char const *method;
+    struct http_head_req *req = &r->hdr_req;
+    switch (req->method) {
+    case HTTP_GET:
+        method = "GET";
+        break;
+    case HTTP_POST:
+        method = "POST";
+        break;
+    case HTTP_PUT:
+        method = "PUT";
+        break;
+    case HTTP_DELETE:
+        method = "DELETE";
+        break;
+    case HTTP_TRACE:
+        method = "TRACE";
+        break;
+    case HTTP_HEAD:
+        method = "HEAD";
+        break;
+    default:
+        method = "Unkown";
+        break;
+    }
+    yhttp_info("%s %.*s\n", method, req->uri.len, req->uri.str);
 }

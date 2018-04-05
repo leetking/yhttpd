@@ -61,9 +61,12 @@ struct setting_vars {
     int timeout;
     int backlog;
     string_t accept_lock;
+    string_t log;
 };
 
 struct setting_t {
+    char cwd[PATH_MAX];
+    char cwd_len;
     struct setting_vars vars;
     struct setting_server server;
 };
