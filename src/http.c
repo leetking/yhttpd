@@ -457,5 +457,5 @@ extern void http_print_request(http_request_t *r)
         method = "Unkown";
         break;
     }
-    yhttp_info("%s %.*s\n", method, req->uri.len, req->uri.str);
+    yhttp_debug("%s %.*s\n", method, req->uri.len, req->uri.str);
 }

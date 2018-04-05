@@ -1,6 +1,8 @@
 #ifndef CONNECTION_H__
 #define CONNECTION_H__
 
+#include <errno.h>
+
 #include <unistd.h>
 
 #include "event.h"
@@ -39,6 +41,20 @@ extern void connection_destroy(connection_t *c);
  *         nbytes
  */
 extern ssize_t connection_read(int fd, char *start, char *end);
-extern ssize_t connection_write(int fd, char const *start, char const *end);
+//extern ssize_t connection_write(int fd, char const *start, char const *end);
+
+static inline ssize_t connection_write(int fd, char const *start, char const *end)
+{
+    if (unlikely(start >= end))
+        return YHTTP_BLOCK;
+    int wrn = write(fd, start, end-start);
+    if (likely(wrn > 0))
+        return wrn;
+    if (wrn == -1 && (EAGAIN == errno || EWOULDBLOCK == errno))
+        return YHTTP_BLOCK;
+    if (wrn == -1 && EINTR == errno)
+        return YHTTP_AGAIN;
+    return YHTTP_ERROR;
+}
 
 #endif /* CONNECTION_H__ */

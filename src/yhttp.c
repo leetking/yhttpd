@@ -50,7 +50,7 @@ static void help(int argc, char **argv)
            "\n"
            "%s v%s\n"
            "(C) GPL v3\n"
-           "Author: leetking <li_Tking@63.com>\n",
+           "Author: leetking <li_Tking@163.com>\n",
            argv[0], argv[0], VER);
 }
 
@@ -166,13 +166,14 @@ int main(int argc, char **argv)
         return 0;
     }
     if (verbose > 0)
-        yhttp_log_set(LOG_DEBUG+verbose);
+        yhttp_log_set(LOG_INFO+verbose);
     if (0 != strncmp("-", VARS->log.str, VARS->log.len)) {
         char buff[PATH_MAX+1];
         int len = MIN(VARS->log.len, PATH_MAX);
         memcpy(buff, VARS->log.str, len);
         buff[len] = '\0';
-        freopen(buff, "w+", stdin);
+        freopen(buff, "a", stdout);
+        freopen(buff, "a", stderr);
     }
     if (as_daemon)
         run_as_daemon();

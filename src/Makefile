@@ -6,7 +6,7 @@ CC := gcc
 RM := rm -rf
 MKDIR := mkdir -p
 
-CFLAGS  := -DVER=\"$(VER)\" -MMD -MP -D_GNU_SOURCE
+CFLAGS  := -DVER=\"$(VER)\" -MMD -MP -D_GNU_SOURCE -Wno-unused-result
 LDFLAGS := -lpthread
 
 CFLAGS_DEBUG    := -g3 -O0 -DDEBUG -Wall -Wno-unused -Wno-format-truncation -Wformat \

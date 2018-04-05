@@ -151,7 +151,7 @@ extern int event_process(msec_t ms)
                 ENV.maxfd = c->fd;
         }
     }
-    
+
     st = sem_trywait(ENV.lock);
     if (0 == st) {
         locked = 1;

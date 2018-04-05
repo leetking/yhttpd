@@ -193,10 +193,10 @@ extern void connection_destroy(connection_t *c)
 
 extern ssize_t connection_read(int fd, char *start, char *end)
 {
-    if (start >= end)
+    if (unlikely(start >= end))
         return YHTTP_BLOCK;
     int rdn = read(fd, start, end-start);
-    if (rdn > 0)
+    if (likely(rdn > 0))
         return rdn;
     if (rdn == -1 && (EAGAIN == errno || EWOULDBLOCK == errno))
         return YHTTP_BLOCK;
@@ -205,12 +205,13 @@ extern ssize_t connection_read(int fd, char *start, char *end)
     return YHTTP_ERROR;
 }
 
+#if 0
 extern ssize_t connection_write(int fd, char const *start, char const *end)
 {
-    if (start >= end)
+    if (unlikely(start >= end))
         return YHTTP_BLOCK;
     int wrn = write(fd, start, end-start);
-    if (wrn > 0)
+    if (likely(wrn > 0))
         return wrn;
     if (wrn == -1 && (EAGAIN == errno || EWOULDBLOCK == errno))
         return YHTTP_BLOCK;
@@ -218,3 +219,4 @@ extern ssize_t connection_write(int fd, char const *start, char const *end)
         return YHTTP_AGAIN;
     return YHTTP_ERROR;
 }
+#endif

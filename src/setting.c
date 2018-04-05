@@ -25,6 +25,8 @@ enum {
     vars_accept_lock,
     vars_backlog,
     vars_worker,
+    vars_log,
+    vars_connection_max,
 };
 
 enum {
@@ -250,6 +252,21 @@ static int setting_parse_vars_value(int key_id, char *start, char *end, struct s
             break;
         }
         return YHTTP_ERROR;
+    case vars_log:
+        if ('/' != *start)
+            return YHTTP_ERROR;
+        vars->log.str = start;
+        vars->log.len = end-start;
+        break;
+
+    case vars_connection_max:
+        if (1 == sscanf(start, "%d", &vars->connection_max)) {
+            if (vars->connection_max <= 0)
+                vars->connection_max = YHTTP_CONNECTION_MAX_CFG;
+            break;
+        }
+        return YHTTP_ERROR;
+        break;
 
     default:
         BUG_ON("setting parse vars value unkown status");
@@ -278,6 +295,8 @@ static int setting_parse_vars(char *str, char *end, struct setting_vars *vars)
         {string_newstr("accept_lock"), vars_accept_lock},
         {string_newstr("backlog"), vars_backlog},
         {string_newstr("worker"), vars_worker},
+        {string_newstr("log"), vars_log},
+        {string_newstr("connection_max"), vars_connection_max},
     };
 
 
@@ -869,6 +888,7 @@ extern int setting_dump(struct setting_t *setting)
     printf("\ttimeout = %d;\n", vars->timeout);
     printf("\twoker = %d;\n", vars->worker);
     printf("\tlog = %.*s;\n", vars->log.len, vars->log.str);
+    printf("\tconnection_max = %d;\n", vars->connection_max);
     /* TODO finish all vars */
     printf("};\n");
     printf("Server {\n");
@@ -923,6 +943,7 @@ extern int setting_init_default(struct setting_t *setting)
     vars->event_interval = YHTTP_EVENT_INTERVAL_CFG;
     vars->backlog = YHTTP_BACKLOG_CFG;
     vars->log.str = "-", vars->log.len = 1;
+    vars->connection_max = YHTTP_CONNECTION_MAX_CFG;
 
     /* default server */
     struct setting_server *ser = &setting->server;

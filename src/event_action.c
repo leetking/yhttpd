@@ -30,6 +30,8 @@
 #define B0(x)   ((x)&0xff)
 #define B1(x)   (B0((x)>>8))
 
+static int connection_cnt = 0;
+
 static char* chunk_data(char *buff, int size)
 {
     static char t[] = "0123456789ABCDEF";
@@ -65,11 +67,19 @@ extern void event_accept_request(event_t *rev)
     int cfd;
     event_t *ev;
     
+    if (connection_cnt > SETTING.vars.connection_max/SETTING.vars.worker) {
+        yhttp_debug("I have too many client %d, give up this request\n", connection_cnt);
+        return;
+    }
+    
     cfd = accept(c->fd, (struct sockaddr*)&cip, &ciplen);
     if (-1 == cfd) {
         yhttp_debug("Accept a new request error(%s)\n", strerror(errno));
         return;
     }
+
+    ++connection_cnt;
+    yhttp_debug("%d connection: %d\n", getpid(), connection_cnt);
     
     set_nonblock(cfd);
 
@@ -97,6 +107,7 @@ extern void event_accept_request(event_t *rev)
 con_err:
     event_free(ev);
 ev_err:
+    --connection_cnt;
     close(cfd);
     yhttp_info("Accept a new request error\n");
 }
@@ -113,6 +124,7 @@ extern void event_init_http_request(event_t *rev)
         BUG_ON(rev->timeout && !rev->timeout_set);
         yhttp_debug("A client(%d)'s request timeouts\n", c->fd);
         connection_destroy(c);
+        --connection_cnt;
         return;
     }
 
@@ -121,6 +133,7 @@ extern void event_init_http_request(event_t *rev)
     if (!r) {
         yhttp_debug2("http request malloc error\n");
         connection_destroy(c);
+        --connection_cnt;
         return;
     }
 
@@ -144,11 +157,12 @@ extern void event_parse_http_head(event_t *sev)
     ssize_t rdn;
     int state;
 
-    if (sev->timeout) {
+    if (unlikely(sev->timeout)) {
         BUG_ON(sev->timeout && !sev->timeout_set);
         yhttp_debug("A client(%d)'s request timeouts\n", c->fd);
         http_request_free(r);
         connection_destroy(c);
+        --connection_cnt;
         return;
     }
 
@@ -160,6 +174,7 @@ extern void event_parse_http_head(event_t *sev)
             yhttp_debug2("read error or finish\n");
             http_request_free(r);
             connection_destroy(c);
+            --connection_cnt;
             return;
         }
         if (rdn == YHTTP_BLOCK)
@@ -187,7 +202,7 @@ extern void event_parse_http_head(event_t *sev)
         }
 
         state = http_parse_request_head(r, r->parse_p, rb->last);
-        if (state == YHTTP_ERROR) {
+        if (unlikely(state == YHTTP_ERROR)) {
             yhttp_debug("Http parse request error\n");
             sev = connection_event_del(c, EVENT_READ);
             BUG_ON(sev->data != c);
@@ -306,7 +321,7 @@ extern void event_respond_page(event_t *sev)
     buffer_t *wbuffer = r->res_buffer;
     int wrn;
 
-    if (sev->timeout) {
+    if (unlikely(sev->timeout)) {
         BUG_ON(sev->timeout && !sev->timeout_set);
         yhttp_debug2("client %d responsd timeout\n", sc->fd);
         goto finish_request;
@@ -314,7 +329,7 @@ extern void event_respond_page(event_t *sev)
 
     for (;;) {
         /* write header */
-        if (wbuffer->pos < wbuffer->last) {
+        if (likely(wbuffer->pos < wbuffer->last)) {
             wrn = connection_write(sc->fd, wbuffer->pos, wbuffer->last);
             if (YHTTP_AGAIN == wrn)
                 continue;
@@ -322,7 +337,7 @@ extern void event_respond_page(event_t *sev)
                 return;
             if (YHTTP_ERROR == wrn) {
                 yhttp_debug2("write header error\n");
-                break;
+                goto finish_request;
             }
             wbuffer->pos += wrn;
 
@@ -356,7 +371,7 @@ extern void event_respond_page(event_t *sev)
                 return;
             if (YHTTP_ERROR == wrn) {
                 yhttp_debug2("write content error\n");
-                break;
+                goto finish_request;
             }
             r->pos += wrn;
         }
@@ -365,6 +380,7 @@ extern void event_respond_page(event_t *sev)
 finish_request:
     http_request_destroy(r);
     connection_destroy(sc);
+    --connection_cnt;
 }
 
 void http_init_static_file(event_t *sev, string_t const *fname)
@@ -379,7 +395,7 @@ void http_init_static_file(event_t *sev, string_t const *fname)
     http_file_t *file = &r->backend.file;
 
     fd = open(fname->str, O_RDONLY);
-    if (-1 == fd) {
+    if (unlikely(-1 == fd)) {
         yhttp_debug2("open %s error: %s\n", fname->str, strerror(errno));
         res->code = HTTP_500;
         http_init_error_page(sev);
@@ -393,14 +409,14 @@ void http_init_static_file(event_t *sev, string_t const *fname)
     }
 
     fev = event_malloc();
-    if (!fev) {
+    if (unlikely(!fev)) {
         yhttp_debug2("event_malloc error\n");
         res->code = HTTP_500;
         http_init_error_page(sev);
         return;
     }
     fc = connection_malloc();
-    if (!fc) {
+    if (unlikely(!fc)) {
         event_free(fev);
         yhttp_debug2("event_malloc error\n");
         res->code = HTTP_500;
@@ -486,7 +502,7 @@ extern void http_fastcgi_respond(event_t *sev, struct setting_fastcgi *setting_f
     http_fastcgi_t *fcgi = &r->backend.fcgi;
 
     fev = event_malloc();
-    if (!fev) {
+    if (unlikely(!fev)) {
         yhttp_debug("event malloc error\n");
         res->code = HTTP_500;
         http_init_error_page(sev);
@@ -502,7 +518,7 @@ extern void http_fastcgi_respond(event_t *sev, struct setting_fastcgi *setting_f
     }
 
     fc = fastcgi_connection_get(setting_fcgi);
-    if (!fc) {
+    if (unlikely(!fc)) {
         yhttp_debug("fastcgi get a connection error\n");
         http_fastcgi_destroy(fcgi);
         event_free(fev);
@@ -512,7 +528,7 @@ extern void http_fastcgi_respond(event_t *sev, struct setting_fastcgi *setting_f
     }
 
     r->ety_buffer = buffer_malloc(YHTTP_BUFFER_SIZE_CFG);
-    if (!r->ety_buffer) {
+    if (unlikely(!r->ety_buffer)) {
         yhttp_debug("alloc memory for body buffer error\n");
         connection_destroy(fc);
         http_fastcgi_destroy(fcgi);
@@ -560,7 +576,7 @@ extern void event_read_file(event_t *fev)
         int rdn = connection_read(fc->fd, b->last, end);
         if (YHTTP_AGAIN == rdn)
             continue;
-        if (YHTTP_ERROR == rdn) {
+        if (unlikely(YHTTP_ERROR == rdn)) {
             yhttp_debug2("read file error YHTTP_ERROR: %s\n", strerror(errno));
             connection_destroy(fc);
             sev = connection_event_del(fc, EVENT_WRITE);
@@ -610,7 +626,7 @@ extern void event_send_file(event_t *sev)
             yhttp_debug2("write return YHTTP_BLOCK\n");
             return;
         }
-        if (YHTTP_ERROR == wrn) {
+        if (unlikely(YHTTP_ERROR == wrn)) {
             yhttp_debug2("write file error YHTTP_ERROR\n");
             goto finish_request;
         }
@@ -649,6 +665,7 @@ finish_request:
     connection_destroy(fc);
     http_request_destroy(r);
     connection_destroy(sc);
+    --connection_cnt;
 }
 
 extern void event_send_to_fcgi(event_t *fev)
@@ -677,6 +694,7 @@ extern void event_send_to_fcgi(event_t *fev)
             http_request_destroy(r);
             connection_destroy(sc);
             connection_destroy(fc);
+            --connection_cnt;
             return;
         }
         b->pos += wrn;
@@ -734,6 +752,7 @@ extern void event_read_request_body(event_t *sev)
             http_request_destroy(r);
             connection_destroy(sc);
             connection_destroy(fc);
+            --connection_cnt;
             return;
         }
         /* read until fill the buffer */
@@ -797,6 +816,7 @@ extern void event_read_fcgi_packet_hdr(event_t *fev)
         connection_destroy(sc);
         http_fastcgi_destroy(fcgi);
         http_request_destroy(r);
+        --connection_cnt;
         return;
     }
 
@@ -884,6 +904,7 @@ extern void event_read_fcgi_packet_bdy(event_t *fev)
             http_fastcgi_destroy(fcgi);
             connection_destroy(sc);
             http_request_destroy(r);
+            --connection_cnt;
             return;
         }
         if (rdn == YHTTP_BLOCK) {
@@ -971,6 +992,7 @@ extern void event_send_fcgi_to_client(event_t *sev)
             connection_destroy(sc);
             http_fastcgi_destroy(fcgi);
             http_request_destroy(r);
+            --connection_cnt;
             return;
         }
 
@@ -991,6 +1013,7 @@ extern void event_send_fcgi_to_client(event_t *sev)
                 http_request_destroy(r);
                 connection_destroy(fc);
                 connection_destroy(sc);
+                --connection_cnt;
                 return;
             }
             connection_pause(sc, EVENT_WRITE);

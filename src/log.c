@@ -36,7 +36,7 @@ extern void yhttp_log(int l, char const *str, ...)
     va_list ap;
     va_start(ap, str);
 
-    printf("%s.%04d %s", buff, (int)(rawtime.tv_nsec/1e9 * 1e4), strlevel[l]);
+    printf("%s.%04d %s ", buff, (int)(rawtime.tv_nsec/1e9 * 1e4), strlevel[l]);
     vprintf(str, ap);
 
     va_end(ap);

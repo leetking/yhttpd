@@ -16,13 +16,11 @@
 #define YHTTP_TIMEOUT_CFG           (5*1000)        /* 5 s */
 #define YHTTP_EVENT_INTERVAL_CFG    (1*1000)        /* 1 s */
 #define YHTTP_BACKLOG_CFG           (511)
+#define YHTTP_CONNECTION_MAX_CFG    (400)
 
 #define YHTTP_CACHE_MAX_AGE_CFG      (3600)
 #define YHTTP_BUFFER_SIZE_CFG        (4096)
 #define YHTTP_LARGE_BUFFER_SIZE_CFG  (2*YHTTP_BUFFER_SIZE_CFG)
-
-#define HTTP_COOKIE_PAIR_MAX_CFG    12
-
 
 struct setting_static {
     string_t root;
@@ -60,6 +58,7 @@ struct setting_vars {
     int event_interval;
     int timeout;
     int backlog;
+    int connection_max;
     string_t accept_lock;
     string_t log;
 };
