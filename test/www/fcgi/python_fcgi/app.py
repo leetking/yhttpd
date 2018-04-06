@@ -9,7 +9,7 @@ prefix='/python'
 def hello_world():
     return 'Hello World from Python'
 @app.route(prefix+'/test-post')
-def pos():
+def post():
     return 'Handle deal from Python'
 
 if __name__ == '__main__':

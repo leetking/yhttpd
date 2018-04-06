@@ -1,8 +1,8 @@
 CC := gcc
 VER := test
 
-#CFLAGS_DEBUG  := -O0 -DYHTTP_DEBUG -fsanitize=address
-#LDFLAGS_DEBUG := -fsanitize=address -rdynamic
+CFLAGS_DEBUG  := -O0 -DYHTTP_DEBUG -fsanitize=address
+LDFLAGS_DEBUG := -fsanitize=address -rdynamic
 
 CFLAGS  := -D_GNU_SOURCE -g -Wall -Wno-format-truncation -Wno-unused -MMD -MP -DVER=\"$(VER)\" \
 	$(CFLAGS_DEBUG)

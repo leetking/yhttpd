@@ -53,6 +53,7 @@ enum {
     HDR_SET_COOKIE,
     HDR_SERVER,
     HDR_CONTENT_TYPE,
+    HDR_CONTENT_LENGTH,
 };
 
 static int get_tcp_connection(string_t *host, int16_t port)
@@ -168,10 +169,11 @@ static int http_fastcgi_parse_key_of_hdr(http_request_t *r, char *start, char *e
         string_t key;
         int id;
     } hdr_keys[] = {
-        {string_newstr("status"),       HDR_STATUS},
-        {string_newstr("set-cookie"),   HDR_SET_COOKIE},
-        {string_newstr("server"),       HDR_SERVER},
-        {string_newstr("content-type"), HDR_CONTENT_TYPE},
+        {string_newstr("status"),           HDR_STATUS},
+        {string_newstr("set-cookie"),       HDR_SET_COOKIE},
+        {string_newstr("server"),           HDR_SERVER},
+        {string_newstr("content-type"),     HDR_CONTENT_TYPE},
+        {string_newstr("content-length"),   HDR_CONTENT_LENGTH},
     };
     string_tolower(start, end-start);
     for (size_t i = 0; i < ARRSIZE(hdr_keys); i++) {
@@ -183,19 +185,27 @@ static int http_fastcgi_parse_key_of_hdr(http_request_t *r, char *start, char *e
     return YHTTP_FAILE;
 }
 
+static int http_fastcgi_parse_content_type(char const *start, char const *end)
+{
+    char const *semicolon;
+    for (semicolon = start; semicolon < end && ';' != *semicolon; semicolon++)
+        ;
+    return http_mime_to_digit(start, semicolon);
+}
+
 static int http_fastcgi_parse_vlu_of_hdr(http_request_t *r, char const *start, char const *end)
 {
     struct http_head_com *com = &r->hdr_com;
     struct http_head_res *res = &r->hdr_res;
     http_fastcgi_t *fcgi = &r->backend.fcgi;
-    int code;
+    int v;
 
     switch (fcgi->hdr_type) {
     case HDR_STATUS:
-        if (1 == sscanf(start, "%d", &code)) {
-            if (!http_error_code_support(code))
+        if (1 == sscanf(start, "%d", &v)) {
+            if (!http_error_code_support(v))
                 return YHTTP_ERROR;
-            res->code = code;
+            res->code = v;
             break;
         }
         return YHTTP_ERROR;
@@ -209,7 +219,15 @@ static int http_fastcgi_parse_vlu_of_hdr(http_request_t *r, char const *start, c
         res->server.len = end-start;
         break;
     case HDR_CONTENT_TYPE:
-        com->content_type = http_mime_to_digit(start, end);
+        com->content_type = http_fastcgi_parse_content_type(start, end);
+        break;
+    case HDR_CONTENT_LENGTH:
+        if (1 == sscanf(start, "%d", &v)) {
+            if (v >= 0)
+                com->content_length = v;
+            break;
+        }
+        return YHTTP_ERROR;
         break;
     default:
         BUG_ON("unkown fcgi header type");
@@ -417,6 +435,7 @@ extern void http_fastcgi_build(http_request_t *r)
         fastcgi_add_str("SERVER_PROTOCOL", "HTTP/1.1", (int)SSTR_LEN("HTTP/1.1"));
     }
     fastcgi_add_str("SCRIPT_NAME", req->uri.str, req->uri.len);
+    fastcgi_add_str("PATH_INFO", req->uri.str, req->uri.len);
     fastcgi_add_str("SERVER_SOFTWARE", "yhttpd/"VER, (int)SSTR_LEN("yhttpd/"VER));
     fastcgi_add_str("SERVER_NAME", SETTING.server.host.str, SETTING.server.host.len);
     fastcgi_add_digit("SERVER_PORT", SETTING.server.port);

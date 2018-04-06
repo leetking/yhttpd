@@ -957,10 +957,12 @@ extern void event_read_fcgi_packet_bdy(event_t *fev)
                     http_build_response_head(r);
                     http_fastcgi_build_extend_head(r);
                     b->pos = fcgi->parse_p;
-                    r->res_buffer->last += (hex_len(buffer_len(b))+2);
-                    buffer_copy(r->res_buffer, b);
-                    chunk_data(r->res_buffer->last - buffer_len(b), buffer_len(b));
-                    r->res_buffer->last += 2;
+                    if (buffer_len(b) > 0) {
+                        r->res_buffer->last += (hex_len(buffer_len(b))+2);
+                        buffer_copy(r->res_buffer, b);
+                        chunk_data(r->res_buffer->last - buffer_len(b), buffer_len(b));
+                        r->res_buffer->last += 2;
+                    }
                     fcgi->read_body = 1;
                     connection_pause(fc, EVENT_READ);
                     connection_revert(sc, EVENT_WRITE);
