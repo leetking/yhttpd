@@ -68,10 +68,10 @@ extern http_request_t *http_request_malloc()
     req = yhttp_malloc(sizeof(*req));
     if (!req)
         return req;
-    req->hdr_buffer = buffer_malloc(YHTTP_BUFFER_SIZE_CFG);
+    req->hdr_buffer = buffer_malloc(SETTING.vars.buffer_size);
     if (!req->hdr_buffer)
         goto req_head_err;
-    req->res_buffer = buffer_malloc(YHTTP_BUFFER_SIZE_CFG);
+    req->res_buffer = buffer_malloc(SETTING.vars.buffer_size);
     if (!req->res_buffer)
         goto req_head_err;
 
@@ -406,7 +406,7 @@ extern int http_request_extend_hdr_buffer(http_request_t *r)
         yhttp_debug2("http request header is too large\n");
         return YHTTP_FAILE;
     }
-    b = buffer_malloc(YHTTP_LARGE_BUFFER_SIZE_CFG);
+    b = buffer_malloc(SETTING.vars.large_buffer_size);
     if (!b) {
         yhttp_debug("allocate memory for http_large_buffer error\n");
         return YHTTP_ERROR;

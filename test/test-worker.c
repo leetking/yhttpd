@@ -21,10 +21,12 @@ int main(int argc, char **argv)
     setting_init_default(&SETTING);
 
     int c;
-    while ((c = getopt(argc, argv, "vc:")) != -1) {
+    int v;
+    while ((c = getopt(argc, argv, "v:c:")) != -1) {
         switch (c) {
         case 'v':
-            yhttp_log_set(LOG_DEBUG2);
+            v = atoi(optarg);
+            yhttp_log_set(LOG_INFO+v);
             break;
         case 'c':
             setting_parse(optarg, &SETTING);

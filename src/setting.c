@@ -15,7 +15,7 @@
 
 struct setting_t SETTING;
 
-struct env {
+static struct env {
     char *cfg_map;
     int cfg_size;
 } ENV;
@@ -27,6 +27,8 @@ enum {
     vars_worker,
     vars_log,
     vars_connection_max,
+    vars_buffer_size,
+    vars_large_buffer_size,
 };
 
 enum {
@@ -268,6 +270,24 @@ static int setting_parse_vars_value(int key_id, char *start, char *end, struct s
         return YHTTP_ERROR;
         break;
 
+    case vars_buffer_size:
+        if (1 == sscanf(start, "%d", &vars->buffer_size)) {
+            if (vars->buffer_size < YHTTP_BUFFER_SIZE_CFG)
+                vars->buffer_size = YHTTP_BUFFER_SIZE_CFG;
+            break;
+        }
+        return YHTTP_ERROR;
+        break;
+
+    case vars_large_buffer_size:
+        if (1 == sscanf(start, "%d", &vars->large_buffer_size)) {
+            if (vars->large_buffer_size < YHTTP_LARGE_BUFFER_SIZE_CFG)
+                vars->large_buffer_size = YHTTP_LARGE_BUFFER_SIZE_CFG;
+            break;
+        }
+        return YHTTP_ERROR;
+        break;
+
     default:
         BUG_ON("setting parse vars value unkown status");
         return YHTTP_ERROR;
@@ -297,6 +317,8 @@ static int setting_parse_vars(char *str, char *end, struct setting_vars *vars)
         {string_newstr("worker"), vars_worker},
         {string_newstr("log"), vars_log},
         {string_newstr("connection_max"), vars_connection_max},
+        {string_newstr("buffer_size"), vars_buffer_size},
+        {string_newstr("large_buffer_size"), vars_large_buffer_size},
     };
 
 
@@ -889,6 +911,8 @@ extern int setting_dump(struct setting_t *setting)
     printf("\twoker = %d;\n", vars->worker);
     printf("\tlog = %.*s;\n", vars->log.len, vars->log.str);
     printf("\tconnection_max = %d;\n", vars->connection_max);
+    printf("\tbuffer_size = %d;\n", vars->buffer_size);
+    printf("\tlarge_buffer_size = %d;\n", vars->large_buffer_size);
     /* TODO finish all vars */
     printf("};\n");
     printf("Server {\n");
@@ -944,6 +968,8 @@ extern int setting_init_default(struct setting_t *setting)
     vars->backlog = YHTTP_BACKLOG_CFG;
     vars->log.str = "-", vars->log.len = 1;
     vars->connection_max = YHTTP_CONNECTION_MAX_CFG;
+    vars->buffer_size = YHTTP_BUFFER_SIZE_CFG;
+    vars->large_buffer_size = YHTTP_LARGE_BUFFER_SIZE_CFG;
 
     /* default server */
     struct setting_server *ser = &setting->server;

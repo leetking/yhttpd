@@ -82,6 +82,7 @@ extern void event_accept_request(event_t *rev)
     yhttp_debug("%d connection: %d\n", getpid(), connection_cnt);
     
     set_nonblock(cfd);
+    set_nondelay(cfd);
 
     ev = event_malloc();
     if (!ev) {
@@ -456,7 +457,8 @@ extern void http_init_response(event_t *sev, struct setting_static *sta)
         fname = &sta->index;
 
     uri_len = snprintf(uri, PATH_MAX, "%s/%.*s/%.*s",
-            SETTING.cwd, sta->root.len, sta->root.str, fname->len, fname->str);
+            '/' == sta->root.str[0]? "": SETTING.cwd,
+            sta->root.len, sta->root.str, fname->len, fname->str);
 
     yhttp_debug2("uri: %s\n", uri);
     if (-1 == stat(uri, st)) {
@@ -527,7 +529,7 @@ extern void http_fastcgi_respond(event_t *sev, struct setting_fastcgi *setting_f
         return;
     }
 
-    r->ety_buffer = buffer_malloc(YHTTP_BUFFER_SIZE_CFG);
+    r->ety_buffer = buffer_malloc(SETTING.vars.buffer_size);
     if (unlikely(!r->ety_buffer)) {
         yhttp_debug("alloc memory for body buffer error\n");
         connection_destroy(fc);

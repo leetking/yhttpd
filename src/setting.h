@@ -59,6 +59,8 @@ struct setting_vars {
     int timeout;
     int backlog;
     int connection_max;
+    int buffer_size;
+    int large_buffer_size;
     string_t accept_lock;
     string_t log;
 };

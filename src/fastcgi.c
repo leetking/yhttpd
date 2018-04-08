@@ -147,7 +147,7 @@ extern connection_t *fastcgi_connection_get(struct setting_fastcgi *setting)
 
 extern int http_fastcgi_init(http_fastcgi_t *fcgi)
 {
-    fcgi->res_buffer = buffer_malloc(YHTTP_BUFFER_SIZE_CFG);
+    fcgi->res_buffer = buffer_malloc(SETTING.vars.buffer_size);
     if (!fcgi->res_buffer)
         return YHTTP_ERROR;
     fcgi->request_id = 1;

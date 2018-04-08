@@ -4,6 +4,9 @@
 
 #include <sched.h>
 #include <fcntl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #include "log.h"
 #include "common.h"
@@ -17,6 +20,14 @@ extern void set_nonblock(int fd)
     }
     if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
         yhttp_warn("Set fd(%d) as nonblock error: %s\n", fd, strerror(errno));
+}
+
+extern void set_nondelay(int fd)
+{
+    int on = 1;
+    if (-1 == setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on))) {
+        yhttp_warn("Prohibit Nagle on fd(%d) error:%s \n", fd, strerror(errno));
+    }
 }
 
 extern void string_tolower(char *str, size_t len)

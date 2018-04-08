@@ -45,6 +45,7 @@ ssize_t read_s(int fd, uint8_t *buff, ssize_t n);
 extern void *memfind(void const *mem, ssize_t memlen, void const *pat, ssize_t patlen);
 extern void set_cpu_affinity(int cpuid);
 extern void set_nonblock(int fd);
+extern void set_nondelay(int fd);
 
 #ifndef offsetof
 # define offsetof(type, member) \

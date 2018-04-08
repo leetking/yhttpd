@@ -197,7 +197,7 @@ int main(int argc, char **argv)
         yhttp_warn("Master# setsockopt: %s\n", strerror(errno));
     set_nonblock(sfd);
 
-    yhttp_info("Master# Listen at http://0.0.0.0:%d\n", SER->port);
+    yhttp_info("Master# Listen at http://%.*s:%d\n", SER->host.len, SER->host.str, SER->port);
     if (-1 == listen(sfd, VARS->backlog)) {
         yhttp_warn("Master# Listen at port(%d) error, BACKLOG is %d: %s\n", SER->port, VARS->backlog, strerror(errno));
         ret = 4;
@@ -273,6 +273,7 @@ int main(int argc, char **argv)
         }
     }
 
+    sem_close(sem);
     sem_unlink(ACCEPT_LOCK);
 sfd_err:
     close(sfd);
