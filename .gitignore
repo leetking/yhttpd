@@ -58,3 +58,6 @@ dkms.conf
 yhttpd
 todo
 study/
+
+# Understand
+*.udb

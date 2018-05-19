@@ -35,7 +35,7 @@ local function status(env)
             "HTTP_COOKIE",
         }
         coroutine.yield("<html><body>")
-        coroutine.yield("<h1>Meta Varibles from <a href='https://github.com/leetking/yhttpd.git'>yhttpd</a></h1>")
+        coroutine.yield("<h1>Meta Variables from <a href='https://github.com/leetking/yhttpd.git'>yhttpd</a></h1>")
         for _, v in pairs(envs) do
             if env[v] then
                 coroutine.yield(("<p><b>%s</b>: %s</p>"):format(v, env[v]))

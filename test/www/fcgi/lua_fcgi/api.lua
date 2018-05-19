@@ -29,8 +29,10 @@ local function post(env)
             args['age'] = "You MUST type your age"
         else
             age = tonumber(args['age'])
-            if age < 0 or age > 200 then
-                args['age'] = "You aren't human!"
+            if not age then
+                args['age'] = "You MUST type a number, not text"
+            elseif age < 0 or age > 150 then
+                args['age'] = "<span style='color: red'>You aren't human!</span>"
             end
         end
         coroutine.yield(template:format(args['name'], args['age'], cookie))

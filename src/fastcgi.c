@@ -44,7 +44,7 @@ string_t http_mimes[] = {
     string_newstr("audio/ogg"),         /* oga */
     string_newstr("video/ogg"),         /* ogv */
     string_newstr("text/plain"),                /* default textual stream */
-    string_newstr("application/x-form-urlencoded"),
+    string_newstr("application/x-www-form-urlencoded"),
     string_newstr("application/octet-stream"),  /* default binary stream */
 };
 
@@ -73,7 +73,7 @@ static int get_tcp_connection(string_t *host, int16_t port)
         }
         sip->sin_family = AF_INET;
         sip->sin_port = htons(port);
-        ENV.solved = 1;
+        /* FIXME Optimize ENV.solved = 0; */
     }
     skt = socket(AF_INET, SOCK_STREAM, 0);
     if (-1 == skt) {
@@ -386,12 +386,12 @@ extern void http_fastcgi_build(http_request_t *r)
     int offset = (l<128)? 2: 5; \
     int len = snprintf(b->last+offset, buffer_rest(b)-offset, "%s%.*s", k, l, (v? v: "")); \
     if (l < 128) { \
-        *(b->last+1) = l; \
+        *(b->last+1) = (unsigned char)B0(l); \
     } else { \
-        *(b->last+1) = B3(l) | (1<<7); \
-        *(b->last+2) = B2(l); \
-        *(b->last+3) = B1(l); \
-        *(b->last+4) = B0(l); \
+        *(b->last+1) = (unsigned char)B3(l) | (1<<7); \
+        *(b->last+2) = (unsigned char)B2(l); \
+        *(b->last+3) = (unsigned char)B1(l); \
+        *(b->last+4) = (unsigned char)B0(l); \
     } \
     b->last += len+offset; \
 } while (0)

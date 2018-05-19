@@ -929,21 +929,23 @@ extern int setting_dump(struct setting_t *setting)
             printf("\t\tindex = %.*s;\n", stat->index.len, stat->index.str);
             break;
         case YHTTP_SETTING_FASTCGI:
+            printf("\t\tFastCGI {\n");
             fcgi = map->setting;
             switch (fcgi->scheme) {
             case YHTTP_SETTING_FASTCGI_TCP:
-                printf("\t\tserver = tcp:%.*s:%d;\n", fcgi->host.len, fcgi->host.str, fcgi->port);
+                printf("\t\t\tserver = tcp:%.*s:%d;\n", fcgi->host.len, fcgi->host.str, fcgi->port);
                 break;
             case YHTTP_SETTING_FASTCGI_TCP6:
-                printf("\t\tserver = tcp6:%.*s:%d;\n", fcgi->host.len, fcgi->host.str, fcgi->port);
+                printf("\t\t\tserver = tcp6:%.*s:%d;\n", fcgi->host.len, fcgi->host.str, fcgi->port);
                 break;
             case YHTTP_SETTING_FASTCGI_UNIX:
-                printf("\t\tserver = unix:%.*s;\n", fcgi->host.len, fcgi->host.str);
+                printf("\t\t\tserver = unix:%.*s;\n", fcgi->host.len, fcgi->host.str);
                 break;
             default:
-                printf("\t\tserver = unkown;\n");
+                printf("\t\t\tserver = unkown;\n");
                 break;
             }
+            printf("\t\t};\n");
             break;
         default:
             BUG_ON("unkown setting type");

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>测试Python FastCGI应用首页</title>
+  <style>
+  .main {
+    width: 1000px;
+    margin: 0 auto;
+  }
+  .main {
+    width: 80%;
+  }
+  .align {
+    display: inline-block;
+    width: 5rem;
+  }
+  </style>
+</head>
+<body>
+  <h1>测试Python FastCGI应用首页</h1>
+  {% if msg %}
+  <p style='color: blue;'>{{msg}}</p>
+  {% endif %}
+
+  <h2>注册新用户</h2>
+  <form action="/python/register" method="post">
+    <span class='align word'>名字:</span><input name="name" type="text" /><br />
+    <span class='align word'>密码:</span><input name="password" type="text" /><br />
+    <input type="submit" value="注册" />
+  </form>
+
+  <h2>登录用户</h2>
+  <form action="/python/login" method="post">
+    <span class='align word'>名字:</span><input name="name" type="text" /><br />
+    <span class='align word'>密码:</span><input name="password" type="text" /><br />
+    <input type="submit" value="登录" />
+  </form>
+
+  <p><a href="/">回到首页</a></p>
+</body>
+</html>

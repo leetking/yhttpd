@@ -8,6 +8,7 @@
 #include "common.h"
 #include "http_parser.h"
 #include "hash.h"
+#include "http_mime.h"
 
 static struct env {
     hash_t hdr_fields;
@@ -358,6 +359,7 @@ static int http_parse_value_of_hdr(http_request_t *r, char const *start, char co
     case HDR_CONTENT_RANGE:
         break;
     case HDR_CONTENT_TYPE:
+        com->content_type = http_mime_to_digit(start, end);
         break;
     case HDR_EXPIRES:
         return http_parse_time_gmt(&com->expires, start, end);

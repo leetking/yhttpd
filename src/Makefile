@@ -12,11 +12,11 @@ LDFLAGS := -lpthread
 CFLAGS_DEBUG    := -g3 -O0 -DDEBUG -Wall -Wno-unused -Wno-format-truncation -Wformat \
 	-DYHTTP_DEBUG -fsanitize=address
 LDFLAGS_DEBUG   := -fsanitize=address -rdynamic
-CFLAGS_RELEASE  := -O2 -DNDEBUG -g -Wall -Werror
+CFLAGS_RELEASE  := -O2 -DNDEBUG -g -Wall -Wno-format-truncation -Werror -Wformat
 LDFLAGS_RELEASE :=
 
-CFLAGS  += $(CFLAGS_RELEASE)
-LDFLAGS += $(LDFLAGS_RELEASE)
+CFLAGS  += $(CFLAGS_DEBUG)
+LDFLAGS += $(LDFLAGS_DEBUG)
 
 SRCS := $(sort $(wildcard *.c))
 DEPS := $(SRCS:.c=.c.d)

@@ -7,7 +7,7 @@ static int http_wildcard_match_inner(char const *str, char const *STREND,
         int dep)
 {
     if (dep <= 0) {
-        yhttp_debug("pattern %.*s to complex\n", PATEND-pat, pat);
+        yhttp_debug("pattern %.*s is too complex\n", PATEND-pat, pat);
         return YHTTP_FAILE;
     }
 
