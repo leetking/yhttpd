@@ -4,10 +4,10 @@
 #include <time.h>
 #include <limits.h>
 
-#include "../src/log.h"
-#include "../src/http.h"
-#include "../src/common.h"
-#include "../src/http_parser.h"
+#include "log.h"
+#include "http.h"
+#include "common.h"
+#include "http_parser.h"
 
 static void test_http10(void)
 {

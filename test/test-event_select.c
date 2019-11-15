@@ -4,8 +4,8 @@
 
 #include <unistd.h>
 
-#include "../src/log.h"
-#include "../src/event.h"
+#include "log.h"
+#include "event.h"
 
 static int loop_quit = 0;
 

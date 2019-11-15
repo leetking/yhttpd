@@ -12,6 +12,7 @@ extern void yhttp_log_set(int l)
     if (l < LOG_ERROR || l > LOG_DEBUG2) return;
     level = l;
 }
+
 extern int yhttp_log_get(void)
 {
     return level;
@@ -41,4 +42,3 @@ extern void yhttp_log(int l, char const *str, ...)
 
     va_end(ap);
 }
-

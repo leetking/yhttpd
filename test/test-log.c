@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "../src/log.h"
+#include "log.h"
 
 int main()
 {

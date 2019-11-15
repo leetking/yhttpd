@@ -66,12 +66,12 @@ extern void event_accept_request(event_t *rev)
     socklen_t ciplen = sizeof(cip);
     int cfd;
     event_t *ev;
-    
+
     if (connection_cnt > SETTING.vars.connection_max/SETTING.vars.worker) {
         yhttp_debug("I have too many client %d, give up this request\n", connection_cnt);
         return;
     }
-    
+
     cfd = accept(c->fd, (struct sockaddr*)&cip, &ciplen);
     if (-1 == cfd) {
         yhttp_debug("Accept a new request error(%s)\n", strerror(errno));
@@ -80,7 +80,7 @@ extern void event_accept_request(event_t *rev)
 
     ++connection_cnt;
     yhttp_debug("%d connection: %d\n", getpid(), connection_cnt);
-    
+
     set_nonblock(cfd);
     set_nondelay(cfd);
 
@@ -219,11 +219,11 @@ extern void event_parse_http_head(event_t *sev)
             struct setting_server *ser = &SETTING.server;
             event_t *ev = connection_event_del(c, EVENT_READ);
             BUG_ON(ev->data != c);
-            
+
             if (HTTP11 == com->version
                     && (req->port != ser->port
-                        || YHTTP_OK != http_wildcard_match(req->host.str, req->host.len,
-                            ser->host.str, ser->host.len))) {
+                        || YHTTP_OK != http_wildcard_match(req->host.str,
+                            req->host.len, ser->host.str, ser->host.len))) {
                 yhttp_debug("Http invalid host\n");
                 res->code = HTTP_400;
                 http_init_error_page(ev);
@@ -403,7 +403,8 @@ void http_init_static_file(event_t *sev, string_t const *fname)
         return;
     }
     if (-1 == lseek(fd, com->content_range1, SEEK_SET)) {
-        yhttp_debug2("lseek %s %d error: %s\n", fname->str, com->content_range1, strerror(errno));
+        yhttp_debug2("lseek %s %d error: %s\n", fname->str,
+                com->content_range1, strerror(errno));
         res->code = HTTP_500;
         http_init_error_page(sev);
         return;

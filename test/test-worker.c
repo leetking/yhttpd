@@ -8,10 +8,10 @@
 #include <fcntl.h>
 #include <semaphore.h>
 
-#include "../src/worker.h"
-#include "../src/common.h"
-#include "../src/log.h"
-#include "../src/setting.h"
+#include "worker.h"
+#include "common.h"
+#include "log.h"
+#include "setting.h"
 
 sem_t *sem;
 int sfd;

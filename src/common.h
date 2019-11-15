@@ -28,7 +28,7 @@ typedef struct string_t {
     int len;
 } string_t;
 #define string_equal(s1, s2)    ((s1)->len == (s2)->len \
-        && !strncmp((s1)->str, (s2)->str, (s1)->len))
+            && !strncmp((s1)->str, (s2)->str, (s1)->len))
 #define string_newstr(str)      {(str), SSTR_LEN(str)}
 #define string_null             {NULL, 0}
 #define string_isnull(s)        ((s)->str == NULL && (s)->len == 0)

@@ -33,7 +33,7 @@ static struct env {
 
 extern int http_error_page_init(char const *dir)
 {
-    char const *tempalte = {
+    char const *template = {
         "<!DOCTYPE html>"
         "<html lang='en'>"
             "<head>"
@@ -61,7 +61,7 @@ extern int http_error_page_init(char const *dir)
         page->ctime = current_sec;
         page->mime = MIME_TEXT_HTML;
         page->file.str = ENV.pos;
-            len = snprintf((char*)page->file.str, HTTP_TEMPLATE_PAGE_SIZE, tempalte,
+            len = snprintf((char*)page->file.str, HTTP_TEMPLATE_PAGE_SIZE, template,
                     pages[i].reason.len, pages[i].reason.str,
                     pages[i].reason.len, pages[i].reason.str,
                     SSTR_LEN("yhttpd/"VER), "yhttpd/"VER);

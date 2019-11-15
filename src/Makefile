@@ -9,8 +9,8 @@ MKDIR := mkdir -p
 CFLAGS  := -DVER=\"$(VER)\" -MMD -MP -D_GNU_SOURCE -Wno-unused-result
 LDFLAGS := -lpthread
 
-CFLAGS_DEBUG    := -g3 -O0 -DDEBUG -Wall -Wno-unused -Wno-format-truncation -Wformat \
-	-DYHTTP_DEBUG -fsanitize=address
+CFLAGS_DEBUG    := -g3 -O0 -DDEBUG -Wall -Wno-unused -Wno-format-truncation \
+		       -Wformat -DYHTTP_DEBUG -fsanitize=address
 LDFLAGS_DEBUG   := -fsanitize=address -rdynamic
 CFLAGS_RELEASE  := -O2 -DNDEBUG -g -Wall -Wno-format-truncation -Werror -Wformat
 LDFLAGS_RELEASE :=
@@ -25,9 +25,11 @@ OBJS := $(SRCS:.c=.c.o)
 $(APP): $(OBJS)
 	@$(CC) -o $@ $^ $(LDFLAGS)
 	@echo "GEN $@"
+
 %.c.o: %.c
 	@$(CC) -o $@ -c $< $(CFLAGS)
 	@echo "CC  $@"
+
 -include $(DEPS)
 
 define rm
@@ -35,10 +37,12 @@ define rm
 	@echo "RM $(1)"
 
 endef
+
 clean:
 	$(foreach f,$(sort $(OBJS) $(DEPS) $(APP)),$(call rm,$(f)))
 
 distclean: clean
+	$(call rm,"compile_commands.json")
 
 tar:
 

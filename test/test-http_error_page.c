@@ -1,7 +1,7 @@
 #include <assert.h>
 
-#include "../src/http.h"
-#include "../src/http_error_page.h"
+#include "http.h"
+#include "http_error_page.h"
 
 int main()
 {

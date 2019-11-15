@@ -1,4 +1,3 @@
-
 all: main test
 
 main:
@@ -11,4 +10,7 @@ clean:
 	$(MAKE) -C src/  distclean
 	$(MAKE) -C test/ distclean
 
-.PHONY: main test
+tar:
+	git archive --format=zip -9 --prefix=yhttpd/ master -o yhttpd-sources.zip
+
+.PHONY: main test tar

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../src/list.h"
+#include "list.h"
 
 typedef struct data_t {
     int x;

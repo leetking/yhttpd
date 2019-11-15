@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <fcntl.h>
 
-#include "../src/ring-buffer.h"
+#include "ring-buffer.h"
 
 static void test_pad_dump(void)
 {

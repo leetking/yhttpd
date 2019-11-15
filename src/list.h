@@ -49,7 +49,7 @@ typedef struct list_t {
 
 #define list_entry(ptr, type, member) \
     container_of(ptr, type, member)
-    
+
 #define list_foreach(list, pos) \
     for (pos = (list)->next; pos != (list); pos = pos->next)
 

@@ -61,3 +61,5 @@ study/
 
 # Understand
 *.udb
+
+compile_commands.json

@@ -1,7 +1,7 @@
 #include <string.h>
 
-#include "../src/http_wildcard.h"
-#include "../src/common.h"
+#include "http_wildcard.h"
+#include "common.h"
 
 #define LNE(s)  (sizeof(s)-1)
 

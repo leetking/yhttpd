@@ -1,9 +1,9 @@
 #include <assert.h>
 
-#include "../src/fastcgi.h"
-#include "../src/http_mime.h"
-#include "../src/http.h"
-#include "../src/http_mime.h"
+#include "fastcgi.h"
+#include "http_mime.h"
+#include "http.h"
+#include "http_mime.h"
 
 static void test1(void)
 {

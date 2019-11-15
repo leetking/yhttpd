@@ -5,7 +5,7 @@ VER := test
 #LDFLAGS_DEBUG := -fsanitize=address -rdynamic
 
 CFLAGS  := -D_GNU_SOURCE -g -Wall -Wno-format-truncation -Wno-unused -MMD -MP -DVER=\"$(VER)\" \
-	$(CFLAGS_DEBUG)
+	$(CFLAGS_DEBUG) -I ../src
 LDFLAGS := -lpthread $(LDFLAGS_DEBUG)
 
 SRCS := $(filter-out ../src/yhttp.c, $(wildcard ../src/*.c))
@@ -45,5 +45,6 @@ clean:
 	$(foreach f,$(sort $(OBJS) $(TEST_OBJS) $(TEST_ALONE)),$(call rm,$(f)))
 distclean: clean
 	$(foreach f,$(sort $(DEPS) $(wildcard *.c.[do] *.d) core),$(call rm,$(f)))
+	$(call rm,"compile_commands.json")
 
 .PHONY: clean all distclean

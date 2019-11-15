@@ -44,7 +44,8 @@ static void help(int argc, char **argv)
            "      -l path    specify a log file\n"
            "      -d         run as daemon\n"
            "      -v <1,2>   verbose\n"
-           "      -z         dump settings and quit, if no configuration file, dump default configuration\n"
+           "      -z         dump settings and quit, if no configuration file,"
+                                "dump default configuration\n"
            "      -c cfg     specify a configuration file\n"
            "      -h         show this page\n"
            "\n"
@@ -188,7 +189,8 @@ int main(int argc, char **argv)
     sip.sin_port   = htons(SER->port);
     sip.sin_addr.s_addr = htonl(INADDR_ANY);
     if (-1 == bind(sfd, (struct sockaddr*)&sip, sizeof(sip))) {
-        yhttp_error("Master# Bind to any address(0.0.0.0:%d): %s\n", SER->port, strerror(errno));
+        yhttp_error("Master# Bind to any address(0.0.0.0:%d): %s\n",
+                SER->port, strerror(errno));
         ret = 3;
         goto sfd_err;
     }
@@ -197,9 +199,11 @@ int main(int argc, char **argv)
         yhttp_warn("Master# setsockopt: %s\n", strerror(errno));
     set_nonblock(sfd);
 
-    yhttp_info("Master# Listen at http://%.*s:%d\n", SER->host.len, SER->host.str, SER->port);
+    yhttp_info("Master# Listen at http://%.*s:%d\n", SER->host.len,
+            SER->host.str, SER->port);
     if (-1 == listen(sfd, VARS->backlog)) {
-        yhttp_warn("Master# Listen at port(%d) error, BACKLOG is %d: %s\n", SER->port, VARS->backlog, strerror(errno));
+        yhttp_warn("Master# Listen at port(%d) error, BACKLOG is %d: %s\n",
+                SER->port, VARS->backlog, strerror(errno));
         ret = 4;
         goto sfd_err;
     }
@@ -253,7 +257,7 @@ int main(int argc, char **argv)
             yhttp_info("Master# All work process have quited\n");
             break;
         }
-        
+
         /* need restart work process */
         if (!quit) {
             pid_t neopid = fork();
@@ -268,7 +272,8 @@ int main(int argc, char **argv)
             } else {
                 works[id] = neopid;
                 alive |= 1<<id;
-                yhttp_info("Master# Restart work process %d# success (%d -> %d)\n", id, pid, neopid);
+                yhttp_info("Master# Restart work process %d# "
+                               "success (%d -> %d)\n", id, pid, neopid);
             }
         }
     }

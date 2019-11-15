@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "../src/hash.h"
+#include "hash.h"
 
 int main()
 {

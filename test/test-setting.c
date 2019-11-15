@@ -1,9 +1,9 @@
 #include <assert.h>
 #include <string.h>
 
-#include "../src/log.h"
-#include "../src/common.h"
-#include "../src/setting.h"
+#include "log.h"
+#include "common.h"
+#include "setting.h"
 
 int main(int argc, char **argv)
 {
